@@ -67,6 +67,7 @@ RGBGFXFLAGS  ?= -Weverything
 	crystal_debug \
 	crystal11_debug \
 	crystal11_vc \
+	patch \
 	clean \
 	tidy \
 	compare \
@@ -118,6 +119,21 @@ compare: $(roms) $(patches)
 
 tools:
 	$(MAKE) -C tools/
+
+# Pokémon Crystal+ distributable patch, diffed against a verified vanilla build.
+# PLUS_VERSION covers every feature in docs/plus.md; the date disambiguates rebuilds.
+PLUS_VERSION := 0.1.0
+PLUS_PATCH   := patches_and_info/pokecrystal_plus_v$(PLUS_VERSION).$(shell date +%y%m%d).bps
+
+patch: $(PLUS_PATCH)
+$(PLUS_PATCH): pokecrystal.gbc pokecrystal_vanilla.gbc
+	mkdir -p $(@D)
+	tools/make_bps.py pokecrystal_vanilla.gbc pokecrystal.gbc $@
+	cp pokecrystal.sym $(@D)/pokecrystal_plus.sym
+
+# Rebuilt whenever the pinned upstream ref changes.
+pokecrystal_vanilla.gbc: tools/vanilla_ref.txt
+	tools/build_vanilla.sh
 
 
 RGBASMFLAGS += -Q8 -P includes.asm

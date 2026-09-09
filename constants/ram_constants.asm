@@ -75,7 +75,8 @@ DEF GBPRINTER_DARKEST  EQU $7f
 
 ; wOptions2::
 	const_def
-	const MENU_ACCOUNT ; 0
+	const MENU_ACCOUNT    ; 0
+	const FRAME_RATE_60_F ; 1 ; plus: 60 fps overworld
 
 ; wDST::
 DEF DST_F EQU 7

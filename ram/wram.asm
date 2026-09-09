@@ -3258,7 +3258,10 @@ wKenjiFightCount::   db ; unreferenced
 wParryFightCount::   db
 wErinFightCount::    db
 
-	ds 100
+; plus: saved randomizer state (carved from unused padding; layout unchanged)
+wPlusSeed::  dw ; wild shuffle seed; 0 = not yet generated
+wPlusFlags:: db ; PLUS_*_F bits, see constants/plus_constants.asm
+	ds 97
 
 wEventFlags:: flag_array NUM_EVENTS
 
@@ -3750,6 +3753,14 @@ NEXTU
 ; unidentified uses
 w6_d000:: ds $1000
 ENDU
+
+
+SECTION "Plus RAM", WRAMX
+
+; plus: species permutation for the wild randomizer, rebuilt from wPlusSeed
+; on load. Indexed by species id (entry 0 unused).
+wPlusWildMap::        ds NUM_POKEMON + 1
+wPlusWildInverseMap:: ds NUM_POKEMON + 1
 
 
 SECTION "Stack RAM", WRAMX
