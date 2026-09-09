@@ -1,8 +1,16 @@
 #!/bin/sh
 set -e
 
+# The build must not modify any tracked file: every generated file belongs in
+# .gitignore. This inspects tracked paths only, so untracked output is not
+# detected here.
+#
+# The refresh clears stale stat entries, so a file the build touched without
+# changing does not trip --quiet, which bails on the first stat mismatch
+# without comparing contents.
+git update-index -q --refresh
 if ! git diff-index --quiet HEAD --; then
-    echo 'Uncommitted changes detected:'
+    echo 'Modified tracked files detected:'
     git diff-index HEAD --
-    return 1
+    exit 1
 fi

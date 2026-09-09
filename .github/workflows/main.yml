@@ -5,105 +5,43 @@ on:
     branches: [ master ]
   pull_request:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   rgbds_version: v1.0.3
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Checkout rgbds
-        uses: actions/checkout@v7
-        with:
-          path: rgbds
-          ref: ${{ env.rgbds_version }}
-          repository: gbdev/rgbds
-
+      # The official Linux binaries are statically linked, so there is no
+      # toolchain or libpng to install and nothing to compile.
       - name: Install rgbds
-        working-directory: rgbds
         run: |
-          sudo apt-get update
-          sudo apt-get install -yq bison libpng-dev pkg-config
-          sudo make -j$(nproc) install
+          curl -fsSL --connect-timeout 15 --max-time 300 --retry 3 --retry-all-errors \
+            -o "$RUNNER_TEMP/rgbds.tar.xz" \
+            "https://github.com/gbdev/rgbds/releases/download/${{ env.rgbds_version }}/rgbds-linux-x86_64.tar.xz"
+          mkdir -p "$RUNNER_TEMP/rgbds"
+          tar -xJf "$RUNNER_TEMP/rgbds.tar.xz" -C "$RUNNER_TEMP/rgbds"
+          sudo install -m 755 -t /usr/local/bin \
+            "$RUNNER_TEMP/rgbds/rgbasm" "$RUNNER_TEMP/rgbds/rgblink" \
+            "$RUNNER_TEMP/rgbds/rgbfix" "$RUNNER_TEMP/rgbds/rgbgfx"
+          for tool in rgbasm rgblink rgbfix rgbgfx; do "$tool" --version; done
 
-      - name: Remove rgbds
-        run: |
-          rm -rf rgbds
-
-      - name: Compare
-        if: ${{ github.repository_owner == 'pret' }}
-        run: |
-          make DEBUG=1 -j$(nproc) compare
-          .github/checkdiff.sh
-
+      # No `make compare`: Crystal+ deliberately does not match roms.sha1.
+      # The gate is that the default target (`all: crystal`) builds without
+      # errors and leaves the tree clean. Note that -Weverything warnings do
+      # not fail the build; rgbasm exits 0 on warnings unless -Werror is set.
       - name: Make
-        if: ${{ github.repository_owner != 'pret' }}
         run: |
           make -j$(nproc)
-          .github/checkdiff.sh
-
-      - name: Discord webhook
-        if: ${{ github.repository_owner == 'pret' && github.event_name == 'push' }}
-        env:
-          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-        run: |
-          .github/webhook.sh
-
-      - name: Checkout symbols
-        if: ${{ github.repository_owner == 'pret' && github.event_name == 'push' }}
-        uses: actions/checkout@v7
-        with:
-          path: symbols
-          ref: symbols
-
-      - name: Move symbols
-        if: ${{ github.repository_owner == 'pret' && github.event_name == 'push' }}
-        run: |
-          cp -v *.sym *.map symbols/
-
-      - name: Update symbols
-        if: ${{ github.repository_owner == 'pret' && github.event_name == 'push' }}
-        uses: EndBug/add-and-commit@v10
-        with:
-          cwd: "./symbols"
-          add: "*.sym *.map"
-          message: ${{ github.event.commits[0].message }}
-
-  build-macos:
-    runs-on: macos-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Checkout rgbds
-        uses: actions/checkout@v7
-        with:
-          path: rgbds
-          ref: ${{ env.rgbds_version }}
-          repository: gbdev/rgbds
-
-      - name: Install rgbds
-        working-directory: rgbds
-        run: |
-          brew install bison libpng pkg-config
-          export PATH="$(brew --prefix bison)/bin:$PATH"
-          sudo make -j$(sysctl -n hw.ncpu) install
-
-      - name: Remove rgbds
-        run: |
-          rm -rf rgbds
-
-      - name: Compare
-        if: ${{ github.repository_owner == 'pret' }}
-        run: |
-          make DEBUG=1 -j$(sysctl -n hw.ncpu) compare
-          .github/checkdiff.sh
-
-      - name: Make
-        if: ${{ github.repository_owner != 'pret' }}
-        run: |
-          make -j$(sysctl -n hw.ncpu)
           .github/checkdiff.sh
