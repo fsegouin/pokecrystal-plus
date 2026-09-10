@@ -99,6 +99,9 @@ TrainerType1:
 	ld [wCurPartyLevel], a
 	ld a, [hli]
 	ld [wCurPartySpecies], a
+	push hl ; plus: trainer roster randomizer
+	farcall PlusRandomizeTrainerMon ; plus: trainer roster randomizer
+	pop hl ; plus: trainer roster randomizer
 	ld a, OTPARTYMON
 	ld [wMonType], a
 	push hl

@@ -29,3 +29,14 @@ DEF PLUS_WILD_SET_OFF EQU NUM_PLUS_WILD_MODES
 	const PLUS_STARTER_MIDDLE ; 1 - Totodile's ball
 	const PLUS_STARTER_RIGHT  ; 2 - Chikorita's ball
 DEF NUM_PLUS_STARTERS EQU const_value
+; trainer roster randomizer
+; band floors, matched to the lists in data/plus/trainer_basics.asm
+DEF PLUS_TRAINER_MID_LEVEL  EQU 15
+DEF PLUS_TRAINER_LATE_LEVEL EQU 30
+
+; effective level at which an evolution without a level of its own applies
+DEF PLUS_EVO_BABY_LEVEL EQU 20 ; happiness, for the four baby species
+DEF PLUS_EVO_ITEM_LEVEL EQU 30 ; item, trade, and every other happiness line
+; 30 rather than 35: after the 8/7 discount only 11 of the 869 mons on normal
+; trainers reach an effective 35, so item and trade evolutions were all but
+; unreachable. At 30 it is 106 of them.

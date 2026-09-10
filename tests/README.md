@@ -6,6 +6,7 @@ PyBoy-driven checks for Pokémon Crystal+ features. Not part of `make`.
     make crystal
     .venv/bin/python tests/harness.py           # smoke test
     .venv/bin/python tests/test_wild.py         # per-feature scripts (added per phase)
+    .venv/bin/python tests/test_trainer.py      # trainer roster randomizer
 
 `test_wild.py` needs no save state. It boots the ROM, mashes through the new
 game flow once, and from there calls the routines under test directly: it

@@ -6,6 +6,7 @@ and distributed as a BPS patch against the vanilla ROM.
 | Feature | Toggle | Status |
 |---|---|---|
 | Wild encounter randomizer (tiered / untiered shuffle, or chaos) | Scientist, Elm's Lab | done |
+| Trainer roster randomizer | Scientist, Cherrygrove Pokémon Center | done |
 
 Scripted encounters (gifts, in-game trades, statics, roamers, Bug Contest)
 are never randomized. The starter is the one deliberate exception.
@@ -84,6 +85,9 @@ Every place vanilla code is modified. Keep this current.
 | `maps/ElmsLab.asm` | 267, 592, 1121 | wild | `PlusOfferStarterScript`, `PlusWildAideScript`, aide text |
 | `maps/GoldenrodGameCorner.asm` | 183-195, 205-217, 227-239 | wild | three prize scripts name and give the mapped species |
 | `maps/CeladonGameCornerPrizeRoom.asm` | 147-159, 169-181, 191-203 | wild | the same for the Kanto prizes |
+| `main.asm` | `"Plus"` section | trainers | includes `data/plus/trainer_basics.asm` and `engine/plus/trainer.asm` |
+| `engine/battle/read_trainer_party.asm` | `TrainerType1` loop | trainers | `farcall PlusRandomizeTrainerMon` between the species write and `predef TryAddMonToParty`, bracketed by `push hl` / `pop hl` |
+| `maps/CherrygrovePokecenter1F.asm` | object list, scripts, texts, object events | trainers | Scientist at (7, 3) and its yes/no toggle script |
 
 ## Design notes
 
@@ -135,4 +139,35 @@ The starters use their own selection over `PlusTierStarter` alone, seeded from
 offer does not move while the player looks at all three. The rival still reads
 `EVENT_GOT_*_FROM_ELM`, which the ball scripts set unchanged, so his choice
 follows the ball taken rather than the species.
+
+**Trainer randomizer.** `TRAINERTYPE_NORMAL` trainers only (397 of 541);
+gym leaders, the rival, Elite Four and anyone with custom moves or items are
+untouched. Each mon is replaced per battle by a random basic-stage species
+from a level-banded list, then evolved along its own line using a level
+discount: evolution thresholds are scaled by 4/3 below level 30 and 8/7 at
+30 and above. Item and trade evolutions apply at 35+, happiness at 20
+(babies) or 35, Tyrogue and Eevee pick a branch at random.
+
+Rather than scale every threshold, the level is discounted once: `L - L/4`
+below 30 and `L - L/8` at 30 and above give the same comparison for two
+shifts and a subtract. The draw pool in `data/plus/trainer_basics.asm` is the
+106 species that survive from the 117 basic-stage, non-legendary, non-Unown
+list, banded by base stat total: 430 and up for level 30+, 300 to 429 for
+15 to 29, below 300 for any level, with the bands falling through so a high
+level draws from all three. Trade evolutions are deliberately kept, since
+dropping them would cost every trainer Alakazam, Machamp, Gengar, Golem,
+Steelix, Scizor and Kingdra.
+
+One consequence of the 35 threshold is worth knowing: the highest-level
+`TRAINERTYPE_NORMAL` mon in the game is Cooltrainer Quinn's level 38 pair,
+and 38 discounts to an effective 34. So no stone or trade evolution can
+actually reach the field until rematches raise trainer levels past 40. The
+threshold is `PLUS_EVO_ITEM_LEVEL`, in one place, if that turns out to be a
+disappointment rather than a slow burn.
+
+Unlike the wild randomizer the roll is unseeded: `Random` is called per mon,
+so a rematch fields a different team. The species is swapped before
+`TryAddMonToParty` runs, which builds the level-up moveset for whatever
+species it is handed, so a randomized mon always has moves it could really
+have learned at that level.
 

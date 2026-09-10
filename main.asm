@@ -690,6 +690,8 @@ INCLUDE "data/plus/wild_tiers.asm"
 INCLUDE "data/plus/wild_chaos_bans.asm"
 INCLUDE "engine/plus/wild.asm"
 INCLUDE "engine/plus/prize_menu.asm"
+INCLUDE "data/plus/trainer_basics.asm"
+INCLUDE "engine/plus/trainer.asm"
 
 
 SECTION "Stadium 2 Checksums", ROMX[$7DE0], BANK[$7F]
