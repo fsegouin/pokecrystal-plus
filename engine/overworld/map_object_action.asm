@@ -51,13 +51,32 @@ SetFacingStepAction:
 
 	ld hl, OBJECT_STEP_FRAME
 	add hl, bc
+; plus: the counter advances once per overworld iteration and the top two bits
+; of its cycle pick the sprite frame. At 60 fps there are twice as many
+; iterations per tile, so stretch the cycle from 16 to 32 to keep the legs
+; moving at the speed they do at 30 fps.
+	ld a, [wOptions2]
+	bit FRAME_RATE_60_F, a
 	ld a, [hl]
+	jr nz, .sixty
 	inc a
 	and %00001111
 	ld [hl], a
 
 	rrca
 	rrca
+	jr .got_frame
+
+.sixty
+	inc a
+	and %00011111
+	ld [hl], a
+
+	rrca
+	rrca
+	rrca
+
+.got_frame
 	maskbits NUM_DIRECTIONS
 	ld d, a
 

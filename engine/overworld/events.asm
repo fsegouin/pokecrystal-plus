@@ -177,8 +177,19 @@ MapEvents:
 MaxOverworldDelay:
 	db 2
 
+; plus: with the 60 fps option on, the overworld loop runs once per frame
+; instead of once every two. StepVectors60 halves the step deltas to match,
+; so walking covers a tile in the same number of frames either way.
+MaxOverworldDelay60:
+	db 1
+
 ResetOverworldDelay:
+	ld a, [wOptions2] ; plus
+	bit FRAME_RATE_60_F, a
 	ld a, [MaxOverworldDelay]
+	jr z, .got_delay
+	ld a, [MaxOverworldDelay60]
+.got_delay
 	ld [wOverworldDelay], a
 	ret
 

@@ -9,6 +9,7 @@ and distributed as a BPS patch against the vanilla ROM.
 | Trainer roster randomizer | Scientist, Cherrygrove Pokémon Center | done |
 | Catch-up EXP booster | Scientist, Celadon Café | done |
 | Trainer and gym leader rematches | always on | done |
+| 60 fps overworld | Options, SELECT sub-page | done (experimental) |
 
 Scripted encounters (gifts, in-game trades, statics, roamers, Bug Contest)
 are never randomized. The starter is the one deliberate exception.
@@ -55,6 +56,7 @@ hook registry below is the complete list either way.
 | `wPlusFlags` (1) | saved; same carve-out | bit 0 wild on · bits 1-2 mode · bit 3 trainers · bit 4 exp boost |
 | `wPlusWildMap`, `wPlusWildInverseMap` (252 each) | WRAMX bank 2, `"Plus RAM"` | rebuilt from the seed on load; not saved |
 | `wPlusRandState` (2), `wPlusStarterSlots` (3), `wPlusMappedSpecies` (1) | WRAMX bank 2, `"Plus RAM"` | build scratch and script hand-off; not saved |
+| `wPlusOptionsPage` (1) | WRAM0; carved from padding before `wJumptableIndex` | which options page is showing; menu-local, never saved |
 | `FRAME_RATE_60_F` | `wOptions2` bit 1 | saved with the other options |
 | ROM code and data | `"Plus"` section, bank `$7f` | ~15 KB free below the Stadium checksums |
 
@@ -110,6 +112,16 @@ Every place vanilla code is modified. Keep this current.
 | `maps/SaffronGym.asm` | 18 | rematches | `.Rematch` branch off the badge check |
 | `maps/SeafoamGym.asm` | 18 | rematches | `.Rematch` branch off the badge check (Blaine's gym) |
 | `maps/ViridianGym.asm` | 14 | rematches | `.Rematch` branch off the badge check |
+| `ram/wram.asm` | before `wJumptableIndex` | 60 fps | `wPlusOptionsPage` carved from `ds 1` |
+| `ram/wram.asm` | `wOptions2` | 60 fps | comment: bit 0 is menu account, bit 1 the frame rate |
+| `engine/overworld/events.asm` | `MaxOverworldDelay` | 60 fps | `MaxOverworldDelay60`; `ResetOverworldDelay` picks between them |
+| `engine/overworld/map_objects.asm` | `GetStepVector` | 60 fps | picks `StepVectors60` when the option is on |
+| `engine/overworld/map_objects.asm` | after `StepVectors` | 60 fps | `StepVectors60` table |
+| `engine/overworld/map_objects.asm` | `AddStepVector` | 60 fps | `CheckStepVectorHoldFrame` gate, and the routine itself |
+| `engine/overworld/map_objects.asm` | `UpdateJumpPosition` | 60 fps | same gate, so a held frame does not climb the arc |
+| `engine/overworld/map_objects.asm` | `_SetRandomStepDuration` | 60 fps | doubles NPC idle pauses |
+| `engine/overworld/map_object_action.asm` | `SetFacingStepAction` | 60 fps | 32-iteration animation cycle |
+| `engine/menus/options_menu.asm` | `_Option` and below | 60 fps | SELECT sub-page: `Options_DrawPage`, `Options_FrameRate`, page-aware `GetOptionPointer` and `OptionsControl` |
 
 ## Design notes
 
@@ -200,3 +212,49 @@ below the fainted enemy's gets ×1.5 per started 3-level gap
 **Rematches.** `AlreadyBeatenTrainerScript` offers a rematch to every map
 trainer; each gym script gets a rematch branch that skips the badge and TM.
 
+**60 fps.** `MaxOverworldDelay` drops from 2 to 1 and `StepVectors` switches
+to a table with halved deltas and doubled durations; the slow step keeps
+its 1 px / 2 frame cadence by moving only on even steps. Whether the
+overworld needs double-speed CPU to fit a frame is measured, not assumed.
+
+(1.5^(1+⌊gap/3⌋)), clamped at 65535. The comparison is per recipient, read
+through `wCurPartyMon`, so a participant that was back in the party rather
+than on the field when the KO landed is still measured against its own level. `BoostExp` is left alone: the clamp lives in the loop in
+`engine/plus/exp.asm`, which saturates on every step, and the three vanilla
+1.5x paths cannot overflow on their own (the largest possible base gain is
+about 3600, and 3600 × 1.5³ is still under 16 bits).
+**Rematches.** Talking to a beaten map trainer offers a rematch before the
+after-battle chat; declining falls through to `AlreadyBeatenTrainerScript`, so
+the vanilla line still plays. The offer hangs off `TalkToTrainerScript` rather
+than off `AlreadyBeatenTrainerScript` itself because
+`StartBattleWithMapTrainerScript` falls through into that label when a battle
+ends: branching earlier keeps the post-battle path untouched and is what makes
+a debounce unnecessary. Ordering the offer after the after-battle chat is not
+possible without an engine change, because `scripttalkafter` jumps into the
+trainer's after-script rather than calling it, and that script's own
+`endifjustbattled` is the thing suppressing a second prompt.
+Each gym leader's beaten branch gets a `.Rematch` label that offers the same
+question, runs `winlosstext`, `loadtrainer`, `startbattle` and stops, so the
+badge award and the TM gift are skipped. Declining falls into the vanilla
+branch. Clair has two beaten branches (before the Rising Badge and after
+TM24), so she gets two offers sharing one battle block. Whitney and Janine
+open their textbox after the beaten check, so their branches open it
+themselves.
+
+A typical iteration costs about half a frame, so the loop fits comfortably at
+either rate. One iteration per tile does not: `UpdateOverworldMap` rebuilds
+the on-screen tilemap from the block map every time the player steps, and that
+alone costs roughly 83,000 cycles, about 1.19 frames. At 30 fps the two-frame
+budget swallows it and the loop never slips. At 60 fps it does not fit, that
+iteration takes two frames instead of one, and a tile ends up costing 17
+frames rather than 16.
+
+So walking at 60 fps is about 6% slower than at 30, with a one-frame hold at
+each tile boundary. Motion is still visibly smoother, since the other 16
+frames each advance a single pixel instead of alternating 2 and 0.
+
+Closing that last frame needs either a cheaper `UpdateOverworldMap` (splitting
+the tilemap rebuild across two iterations) or double-speed CPU. Double speed
+is not enabled here: it would halve the cost and make the iteration fit, but
+it also moves audio, serial, link and RTC timing, which is far more than this
+feature should be allowed to disturb on its own.

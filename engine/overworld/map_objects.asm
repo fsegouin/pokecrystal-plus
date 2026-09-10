@@ -330,6 +330,13 @@ GetNextTile:
 
 AddStepVector:
 	call GetStepVector
+	call CheckStepVectorHoldFrame ; plus
+	jr nc, .move
+	ld d, 0 ; plus: hold still, and contribute nothing to the camera
+	ld e, 0
+	ret
+
+.move
 	ld hl, OBJECT_SPRITE_X
 	add hl, bc
 	ld a, [hl]
@@ -340,6 +347,27 @@ AddStepVector:
 	ld a, [hl]
 	add e
 	ld [hl], a
+	ret
+
+; plus: the 60 fps step table halves every delta, but the slow step is already
+; down to one pixel and cannot be halved. It runs for twice as many iterations
+; instead and moves on every other one, which averages out to the same half
+; pixel per frame. Returns carry when this iteration must not move the object.
+; Clobbers a, hl and the flags; leaves bc, d and e alone.
+CheckStepVectorHoldFrame:
+	and a ; by default, move
+	ld a, [wOptions2]
+	bit FRAME_RATE_60_F, a
+	ret z
+	ld hl, OBJECT_WALKING
+	add hl, bc
+	ld a, [hl]
+	and %00001100 ; the step type; STEP_SLOW is 0
+	ret nz
+	ld hl, OBJECT_STEP_DURATION
+	add hl, bc
+	ld a, [hl]
+	rrca ; carry <- duration bit 0
 	ret
 
 GetStepVector:
@@ -353,6 +381,11 @@ GetStepVector:
 	ld l, a
 	ld h, 0
 	ld de, StepVectors
+	ld a, [wOptions2] ; plus
+	bit FRAME_RATE_60_F, a
+	jr z, .got_table
+	ld de, StepVectors60
+.got_table
 	add hl, de
 	ld d, [hl]
 	inc hl
@@ -379,6 +412,29 @@ StepVectors:
 	db  0, -4,  4, 4
 	db -4,  0,  4, 4
 	db  4,  0,  4, 4
+
+; plus: the same movement at 60 fps. Every delta is halved and every duration
+; doubled, so duration x delta still comes to one tile and duration x speed
+; still comes to the 16 units a jump arc expects. The slow row cannot halve a
+; one-pixel delta, so it doubles its duration and holds still on the odd
+; iterations instead (see CheckStepVectorHoldFrame).
+StepVectors60:
+; x,  y, duration, speed
+	; slow
+	db  0,  1, 32, 1
+	db  0, -1, 32, 1
+	db -1,  0, 32, 1
+	db  1,  0, 32, 1
+	; normal
+	db  0,  1, 16, 1
+	db  0, -1, 16, 1
+	db -1,  0, 16, 1
+	db  1,  0, 16, 1
+	; fast
+	db  0,  2,  8, 2
+	db  0, -2,  8, 2
+	db -2,  0,  8, 2
+	db  2,  0,  8, 2
 
 GetStepVectorSign:
 	add a
@@ -1072,6 +1128,17 @@ RandomStepDuration_Fast:
 	ldh a, [hRandomAdd]
 	and %00011111
 _SetRandomStepDuration:
+; plus: this pause is counted in loop iterations, and at 60 fps there are twice
+; as many of them per second, so double it to keep idle NPCs fidgeting at the
+; same rate. The largest value either caller can produce is 127, so this
+; cannot overflow.
+	ld d, a
+	ld a, [wOptions2]
+	bit FRAME_RATE_60_F, a
+	ld a, d
+	jr z, .got_duration
+	add a
+.got_duration
 	ld hl, OBJECT_STEP_DURATION
 	add hl, bc
 	ld [hl], a
@@ -1827,7 +1894,17 @@ Stubbed_UpdateYOffset:
 
 UpdateJumpPosition:
 	call GetStepVector
-	ld a, h
+; plus: the arc climbs by the step vector's speed each iteration, so a frame
+; the object holds still on must not climb either. Without this a 60 fps slow
+; jump would run the height to 64 and index .y_offsets, which has 16 entries,
+; well past its end. `ld a, 0` rather than `xor a`, which would clear the
+; carry this is about to test.
+	ld d, h
+	call CheckStepVectorHoldFrame
+	ld a, 0
+	jr c, .got_speed
+	ld a, d
+.got_speed
 	ld hl, OBJECT_JUMP_HEIGHT
 	add hl, bc
 	ld e, [hl]

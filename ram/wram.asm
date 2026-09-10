@@ -1591,7 +1591,9 @@ wCurSpecies:: db
 
 wNamedObjectType:: db
 
-	ds 1
+; plus: which page the options menu is showing (carved from unused padding,
+; so the size of this region is unchanged). Menu-local scratch, never saved.
+wPlusOptionsPage:: db
 
 wJumptableIndex::
 wBattleTowerBattleEnded::
@@ -1891,7 +1893,8 @@ wGBPrinterBrightness::
 ;   darkest:  $7F
 	db
 wOptions2::
-; bit 1: menu account off/on
+; bit 0: menu account off/on
+; bit 1: overworld frame rate 30/60 ; plus
 	db
 	ds 2
 wOptionsEnd::
@@ -3788,7 +3791,6 @@ wPlusStarterSlots:: ds 3
 ; plus: the species a prize or starter script settled on, so the mon handed
 ; over is the one whose name and picture were shown
 wPlusMappedSpecies:: db
-
 
 
 

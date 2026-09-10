@@ -10,6 +10,16 @@
 	const OPT_CANCEL        ; 7
 DEF NUM_OPTIONS EQU const_value ; 8
 
+; plus: the eight rows above fill the screen, so anything new goes on a second
+; page reached with SELECT. GetOptionPointer.PlusPointers indexes.
+	const_def
+	const PLUS_OPT_FRAME_RATE ; 0
+	const PLUS_OPT_CANCEL     ; 1
+DEF NUM_PLUS_OPTIONS EQU const_value ; 2
+
+DEF OPTIONS_PAGE_MAIN EQU 0
+DEF OPTIONS_PAGE_PLUS EQU 1
+
 _Option:
 ; BUG: Options menu fails to clear joypad state on initialization (see docs/bugs_and_glitches.md)
 	ld hl, hInMenu
@@ -17,35 +27,9 @@ _Option:
 	push af
 	ld [hl], TRUE
 	call ClearBGPalettes
-	hlcoord 0, 0
-	ld b, SCREEN_HEIGHT - 2
-	ld c, SCREEN_WIDTH - 2
-	call Textbox
-	hlcoord 2, 2
-	ld de, StringOptions
-	call PlaceString
-	xor a
-	ld [wJumptableIndex], a
-
-; display the settings of each option when the menu is opened
-	ld c, NUM_OPTIONS - 2 ; omit frame type, the last option
-.print_text_loop
-	push bc
-	xor a
-	ldh [hJoyLast], a
-	call GetOptionPointer
-	pop bc
-	ld hl, wJumptableIndex
-	inc [hl]
-	dec c
-	jr nz, .print_text_loop
-	call UpdateFrame ; display the frame type
-
-	xor a
-	ld [wJumptableIndex], a
-	inc a
-	ldh [hBGMapMode], a
-	call WaitBGMap
+	ld a, OPTIONS_PAGE_MAIN ; plus: always open on the familiar page
+	ld [wPlusOptionsPage], a
+	call Options_DrawPage
 	ld b, SCGB_DIPLOMA
 	call GetSGBLayout
 	call SetDefaultBGPAndOBP
@@ -55,6 +39,9 @@ _Option:
 	ldh a, [hJoyPressed]
 	and PAD_START | PAD_B
 	jr nz, .ExitOptions
+	ldh a, [hJoyPressed] ; plus
+	and PAD_SELECT
+	jr nz, .SwitchPage
 	call OptionsControl
 	jr c, .dpad
 	call GetOptionPointer
@@ -66,12 +53,74 @@ _Option:
 	call DelayFrames
 	jr .joypad_loop
 
+.SwitchPage: ; plus
+	ld hl, wPlusOptionsPage
+	ld a, [hl]
+	xor OPTIONS_PAGE_PLUS
+	ld [hl], a
+	ld de, SFX_READ_TEXT_2
+	call PlaySFX
+	call Options_DrawPage
+	jr .joypad_loop
+
 .ExitOptions:
 	ld de, SFX_TRANSACTION
 	call PlaySFX
 	call WaitSFX
 	pop af
 	ldh [hInMenu], a
+	ret
+
+; plus: draw the current page from scratch, cursor and current values and all.
+; Run once when the menu opens and again on every SELECT.
+Options_DrawPage:
+	xor a
+	ldh [hBGMapMode], a
+	hlcoord 0, 0
+	ld b, SCREEN_HEIGHT - 2
+	ld c, SCREEN_WIDTH - 2
+	call Textbox
+	hlcoord 2, 2
+	ld a, [wPlusOptionsPage]
+	and a
+	jr nz, .plus_page
+	ld de, StringOptions
+	call PlaceString
+	xor a
+	ld [wJumptableIndex], a
+; display the settings of each option when the menu is opened
+	ld c, NUM_OPTIONS - 2 ; omit frame type, the last option
+	call .print_values
+	call UpdateFrame ; display the frame type
+	jr .drawn
+
+.plus_page
+	ld de, StringPlusOptions
+	call PlaceString
+	xor a
+	ld [wJumptableIndex], a
+	ld c, NUM_PLUS_OPTIONS - 1 ; omit CANCEL, which has nothing to show
+	call .print_values
+
+.drawn
+	xor a
+	ld [wJumptableIndex], a
+	call Options_UpdateCursorPosition
+	ld a, 1
+	ldh [hBGMapMode], a
+	call WaitBGMap
+	ret
+
+.print_values
+	push bc
+	xor a
+	ldh [hJoyLast], a
+	call GetOptionPointer
+	pop bc
+	ld hl, wJumptableIndex
+	inc [hl]
+	dec c
+	jr nz, .print_values
 	ret
 
 StringOptions:
@@ -91,8 +140,20 @@ StringOptions:
 	db "        :TYPE<LF>"
 	db "CANCEL@"
 
+; plus: the SELECT page
+StringPlusOptions:
+	db "FRAME RATE<LF>"
+	db "        :<LF>"
+	db "CANCEL@"
+
 GetOptionPointer:
+	ld a, [wPlusOptionsPage] ; plus
+	and a
+	jr nz, .plus_page
 	jumptable .Pointers, wJumptableIndex
+
+.plus_page ; plus
+	jumptable .PlusPointers, wJumptableIndex
 
 .Pointers:
 ; entries correspond to OPT_* constants
@@ -103,6 +164,11 @@ GetOptionPointer:
 	dw Options_Print
 	dw Options_MenuAccount
 	dw Options_Frame
+	dw Options_Cancel
+
+.PlusPointers: ; plus
+; entries correspond to PLUS_OPT_* constants
+	dw Options_FrameRate
 	dw Options_Cancel
 
 	const_def
@@ -453,6 +519,48 @@ Options_MenuAccount:
 .Off: db "OFF@"
 .On:  db "ON @"
 
+; plus: 30 runs the overworld loop every other frame, as the game always has;
+; 60 runs it every frame with half-size steps, so walking takes the same time
+; but the screen scrolls a pixel at a time instead of two. Only bit
+; FRAME_RATE_60_F is touched, leaving MENU_ACCOUNT beside it alone.
+Options_FrameRate:
+	ld hl, wOptions2
+	ldh a, [hJoyPressed]
+	bit B_PAD_LEFT, a
+	jr nz, .LeftPressed
+	bit B_PAD_RIGHT, a
+	jr z, .NonePressed
+	bit FRAME_RATE_60_F, [hl]
+	jr nz, .Set30
+	jr .Set60
+
+.LeftPressed:
+	bit FRAME_RATE_60_F, [hl]
+	jr z, .Set60
+	jr .Set30
+
+.NonePressed:
+	bit FRAME_RATE_60_F, [hl]
+	jr nz, .Set60
+
+.Set30:
+	res FRAME_RATE_60_F, [hl]
+	ld de, .Thirty
+	jr .Display
+
+.Set60:
+	set FRAME_RATE_60_F, [hl]
+	ld de, .Sixty
+
+.Display:
+	hlcoord 11, 3
+	call PlaceString
+	and a
+	ret
+
+.Thirty: db "30@"
+.Sixty:  db "60@"
+
 Options_Frame:
 	ld hl, wTextboxFrame
 	ldh a, [hJoyPressed]
@@ -505,7 +613,19 @@ OptionsControl:
 	and a
 	ret
 
+; plus: the second page has two entries, so up and down both just flip between
+; them. PLUS_OPT_CANCEL is 1, so xor with it toggles.
+.PlusPage:
+	ld a, [hl]
+	xor PLUS_OPT_CANCEL
+	ld [hl], a
+	scf
+	ret
+
 .DownPressed:
+	ld a, [wPlusOptionsPage] ; plus
+	and a
+	jr nz, .PlusPage
 	ld a, [hl]
 	cp OPT_CANCEL ; maximum option index
 	jr nz, .CheckMenuAccount
@@ -524,6 +644,9 @@ OptionsControl:
 	ret
 
 .UpPressed:
+	ld a, [wPlusOptionsPage] ; plus
+	and a
+	jr nz, .PlusPage
 	ld a, [hl]
 
 ; Another thing where I'm not sure why it exists

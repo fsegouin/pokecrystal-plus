@@ -41,3 +41,9 @@ reaching the situation that would normally call it. `test_exp.py` uses it.
 `test_rematch.py` needs no emulator at all: it decodes the assembled script
 bytecode out of the ROM using an opcode table parsed from
 `macros/scripts/events.asm`.
+    .venv/bin/python tests/test_fps.py          # 60 fps overworld option
+    .venv/bin/python tests/measure_overworld.py # overworld loop timings
+    .venv/bin/python tests/compare_builds.py other.gbc
+`boot.py` scripts a brand-new game up to the overworld and caches the result
+as a save state keyed by the ROM's hash, and `nav.py` walks from there to New
+Bark Town. Between them, no check needs a hand-made save state.
