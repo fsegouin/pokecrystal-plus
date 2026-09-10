@@ -264,6 +264,7 @@ SavedTheGame:
 	ret
 
 _SaveGameData:
+	call PlusNormalSpeed ; plus
 	ld a, TRUE
 	ld [wSaveFileExists], a
 	farcall StageRTCTimeForSave

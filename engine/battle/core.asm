@@ -8034,11 +8034,13 @@ StartBattle:
 	and a
 	ret z
 
+	call PlusNormalSpeed ; plus
 	ld a, [wTimeOfDayPal]
 	push af
 	call BattleIntro
 	call DoBattle
 	call ExitBattle
+	call PlusUpdateOverworldSpeed ; plus: while the screen is still down
 	pop af
 	ld [wTimeOfDayPal], a
 	scf

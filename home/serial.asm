@@ -128,6 +128,7 @@ Serial_ExchangeBytes::
 	ret
 
 Serial_ExchangeByte::
+	call PlusNormalSpeed ; plus
 .timeout_loop
 	xor a
 	ldh [hSerialReceivedNewData], a
@@ -350,6 +351,7 @@ endc
 	ret
 
 LinkTransfer::
+	call PlusNormalSpeed ; plus
 	push bc
 	ld b, SERIAL_TIMECAPSULE
 	ld a, [wLinkMode]
@@ -395,6 +397,7 @@ LinkTransfer::
 
 LinkDataReceived::
 ; Let the other system know that the data has been received.
+	call PlusNormalSpeed ; plus
 	xor a
 	ldh [hSerialSend], a
 	ldh a, [hSerialConnectionStatus]

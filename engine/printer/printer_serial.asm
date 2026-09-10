@@ -1,4 +1,5 @@
 Printer_StartTransmission:
+	call PlusNormalSpeed ; plus
 	ld hl, wGameboyPrinterRAM
 	ld bc, wGameboyPrinterRAMEnd - wGameboyPrinterRAM
 	xor a

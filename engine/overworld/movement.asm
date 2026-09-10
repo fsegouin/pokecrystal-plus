@@ -128,9 +128,7 @@ Movement_step_dig:
 	add hl, bc
 	ld [hl], OBJECT_ACTION_SPIN
 	call JumpMovementPointer
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], a
+	call SetStepDuration60 ; plus
 	ld hl, OBJECT_STEP_TYPE
 	add hl, bc
 	ld [hl], STEP_TYPE_SLEEP
@@ -147,9 +145,7 @@ Movement_return_dig:
 	add hl, bc
 	ld [hl], a
 	call JumpMovementPointer
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], a
+	call SetStepDuration60 ; plus
 	ld hl, OBJECT_WALKING
 	add hl, bc
 	ld [hl], STANDING
@@ -169,9 +165,7 @@ Movement_fish_got_bite:
 
 Movement_rock_smash:
 	call JumpMovementPointer
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], a
+	call SetStepDuration60 ; plus
 	ld hl, OBJECT_ACTION
 	add hl, bc
 	ld [hl], OBJECT_ACTION_STAND
@@ -224,9 +218,7 @@ Movement_step_wait_end:
 	ld [hl], $0
 
 	call JumpMovementPointer
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], a
+	call SetStepDuration60 ; plus
 
 	ld hl, OBJECT_STEP_TYPE
 	add hl, bc
@@ -302,9 +294,7 @@ Movement_step_sleep:
 	jr Movement_step_sleep_common
 
 Movement_step_sleep_common:
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], a
+	call SetStepDuration60 ; plus
 
 	ld hl, OBJECT_STEP_TYPE
 	add hl, bc
@@ -321,9 +311,7 @@ Movement_step_sleep_common:
 
 Movement_step_bump:
 	ld a, 1
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], a
+	call SetStepDuration60 ; plus
 
 	ld hl, OBJECT_STEP_TYPE
 	add hl, bc
@@ -340,9 +328,7 @@ Movement_step_bump:
 
 Movement_tree_shake:
 	ld a, 24
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], a
+	call SetStepDuration60 ; plus
 
 	ld hl, OBJECT_STEP_TYPE
 	add hl, bc

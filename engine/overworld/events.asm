@@ -106,6 +106,7 @@ StartMap:
 	farcall InitCallReceiveDelay
 	call ClearJoypad
 EnterMap:
+	call PlusUpdateOverworldSpeed ; plus
 	xor a
 	ld [wXYComparePointer], a
 	ld [wXYComparePointer + 1], a
@@ -138,6 +139,7 @@ UnusedWait30Frames: ; unreferenced
 	ret
 
 HandleMap:
+	call PlusUpdateOverworldSpeed ; plus
 	call ResetOverworldDelay
 	call HandleMapTimeAndJoypad
 	farcall HandleCmdQueue ; no need to farcall
@@ -191,6 +193,21 @@ ResetOverworldDelay:
 	ld a, [MaxOverworldDelay60]
 .got_delay
 	ld [wOverworldDelay], a
+	ret
+
+; plus: a script delay is counted in overworld loop iterations, and the 60 fps
+; option runs that loop twice as often, so a delay written while it is on has
+; to be doubled to pause for the same wall clock time. Saturates rather than
+; wrapping. Preserves bc, de and hl.
+ScaleScriptDelay60:
+	push hl
+	ld hl, wOptions2
+	bit FRAME_RATE_60_F, [hl]
+	pop hl
+	ret z
+	add a
+	ret nc
+	ld a, -1
 	ret
 
 NextOverworldFrame:

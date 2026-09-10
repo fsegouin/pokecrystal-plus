@@ -33,9 +33,14 @@ PlusBuildPrizeMenu::
 	push bc
 	ld a, [de]
 	inc de ; de now points at the price text
-	ld [wNamedObjectIndex], a
 	push de
 	push hl
+	; the prize is shuffled like any other wild species, so name the mon that
+	; will actually be handed over, not the one in the table
+	ld b, a
+	call PlusMapWildSpecies ; preserves de and hl, returns in b
+	ld a, b
+	ld [wNamedObjectIndex], a
 	call GetPokemonName ; writes wStringBuffer1
 	pop hl
 

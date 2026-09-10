@@ -349,6 +349,25 @@ AddStepVector:
 	ld [hl], a
 	ret
 
+; plus: everything an overworld object does is counted in loop iterations, and
+; the 60 fps option runs that loop twice as often. Durations are doubled where
+; they are written, by SetStepDuration60. An effect that instead walks a fixed
+; length table one entry per iteration cannot be doubled that way, because the
+; index would run off the end, so it sits out half of the iterations of the
+; doubled duration. Returns carry on the iterations to sit out. Clobbers a and
+; hl; leaves bc, d and e alone.
+CheckHoldFrame60:
+	and a ; by default, act
+	ld a, [wOptions2]
+	bit FRAME_RATE_60_F, a
+	ret z
+.parity
+	ld hl, OBJECT_STEP_DURATION
+	add hl, bc
+	ld a, [hl]
+	rrca ; carry <- duration bit 0
+	ret
+
 ; plus: the 60 fps step table halves every delta, but the slow step is already
 ; down to one pixel and cannot be halved. It runs for twice as many iterations
 ; instead and moves on every other one, which averages out to the same half
@@ -364,10 +383,65 @@ CheckStepVectorHoldFrame:
 	ld a, [hl]
 	and %00001100 ; the step type; STEP_SLOW is 0
 	ret nz
+	jr CheckHoldFrame60.parity
+
+; plus: store a as an object's step duration, doubled when the 60 fps option is
+; on so that it lasts the same wall clock time. Preserves bc and de.
+SetStepDuration60:
+	call ScaleDuration60
 	ld hl, OBJECT_STEP_DURATION
 	add hl, bc
+	ld [hl], a
+	ret
+
+; plus: double an iteration count when the 60 fps option is on, saturating
+; rather than wrapping, since wrapping past 255 could turn a short pause into
+; a very long one. Preserves bc, de and hl, so it drops in anywhere a duration
+; is about to be stored.
+ScaleDuration60:
+	push hl
+	ld hl, wOptions2
+	bit FRAME_RATE_60_F, [hl]
+	pop hl
+	ret z
+	add a
+	ret nc
+	ld a, -1
+	ret
+
+; plus: the teleport and skyfall arcs step a 64 entry sine table one entry per
+; iteration for exactly 16 iterations. Doubling that duration would run the
+; index to 32, so the height advances on only half of the doubled iterations
+; instead. Returns the height in a. Preserves bc; clobbers d, hl and the flags.
+UpdateJumpHeight60:
+	call CheckHoldFrame60
+	ld a, 0 ; not xor a, which would clear the carry
+	jr c, .got_step
+	inc a
+.got_step
+	ld d, a
+	ld hl, OBJECT_JUMP_HEIGHT
+	add hl, bc
 	ld a, [hl]
-	rrca ; carry <- duration bit 0
+	add d
+	ld [hl], a
+	ret
+
+; plus: an effect that flips between two states once per iteration flips twice
+; as fast at 60 fps. Take a step duration in a and return with the zero flag
+; set on the same wall clock frames vanilla sets it on: on bit 0 at 30 fps, and
+; on bit 1 of the doubled duration at 60. Preserves bc, de and hl.
+CheckAlternateFrame60:
+	push hl
+	ld hl, wOptions2
+	bit FRAME_RATE_60_F, [hl]
+	pop hl
+	jr z, .thirty
+	and %00000010
+	ret
+
+.thirty
+	and %00000001
 	ret
 
 GetStepVector:
@@ -870,9 +944,7 @@ _MovementSpinRepeat:
 	add hl, bc
 	ld a, [hl]
 	ld a, $10
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], a
+	call SetStepDuration60 ; plus
 	ld hl, OBJECT_STEP_TYPE
 	add hl, bc
 	ld [hl], STEP_TYPE_SLEEP
@@ -1061,9 +1133,10 @@ MovementFunction_ScreenShake:
 	add hl, bc
 	ld a, [hl]
 	call .GetDurationAndField1e
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], e
+	ld d, a ; plus: hold on to the amplitude
+	ld a, e
+	call SetStepDuration60 ; plus
+	ld a, d
 	ld hl, OBJECT_1E
 	add hl, bc
 	ld [hl], a
@@ -1289,9 +1362,8 @@ StepFunction_TeleportFrom:
 	ld hl, OBJECT_STEP_FRAME
 	add hl, bc
 	ld [hl], 0
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], 16
+	ld a, 16 ; plus
+	call SetStepDuration60
 	call ObjectStep_IncAnonJumptableIndex
 .DoSpin:
 	ld hl, OBJECT_ACTION
@@ -1311,9 +1383,8 @@ StepFunction_TeleportFrom:
 	ld hl, OBJECT_JUMP_HEIGHT
 	add hl, bc
 	ld [hl], $10
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], 16
+	ld a, 16 ; plus
+	call SetStepDuration60
 	ld hl, OBJECT_FLAGS2
 	add hl, bc
 	res IN_GRASS_F, [hl]
@@ -1322,10 +1393,7 @@ StepFunction_TeleportFrom:
 	ld hl, OBJECT_ACTION
 	add hl, bc
 	ld [hl], OBJECT_ACTION_SPIN
-	ld hl, OBJECT_JUMP_HEIGHT
-	add hl, bc
-	inc [hl]
-	ld a, [hl]
+	call UpdateJumpHeight60 ; plus
 	ld d, $60
 	call Sine
 	ld a, h
@@ -1360,9 +1428,8 @@ StepFunction_TeleportTo:
 	ld hl, OBJECT_ACTION
 	add hl, bc
 	ld [hl], OBJECT_ACTION_00
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], 16
+	ld a, 16 ; plus
+	call SetStepDuration60
 	call ObjectStep_IncAnonJumptableIndex
 	ret
 
@@ -1379,9 +1446,8 @@ StepFunction_TeleportTo:
 	ld hl, OBJECT_JUMP_HEIGHT
 	add hl, bc
 	ld [hl], 0
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], 16
+	ld a, 16 ; plus
+	call SetStepDuration60
 	call ObjectStep_IncAnonJumptableIndex
 	ret
 
@@ -1389,10 +1455,7 @@ StepFunction_TeleportTo:
 	ld hl, OBJECT_ACTION
 	add hl, bc
 	ld [hl], OBJECT_ACTION_SPIN
-	ld hl, OBJECT_JUMP_HEIGHT
-	add hl, bc
-	inc [hl]
-	ld a, [hl]
+	call UpdateJumpHeight60 ; plus
 	ld d, $60
 	call Sine
 	ld a, h
@@ -1406,9 +1469,8 @@ StepFunction_TeleportTo:
 	ret nz
 	call ObjectStep_IncAnonJumptableIndex
 .InitFinalSpin:
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], 16
+	ld a, 16 ; plus
+	call SetStepDuration60
 	call ObjectStep_IncAnonJumptableIndex
 	ret
 
@@ -1444,9 +1506,8 @@ StepFunction_Skyfall:
 	ld hl, OBJECT_ACTION
 	add hl, bc
 	ld [hl], OBJECT_ACTION_00
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], 16
+	ld a, 16 ; plus
+	call SetStepDuration60
 	call ObjectStep_IncAnonJumptableIndex
 .Step:
 	ld hl, OBJECT_STEP_DURATION
@@ -1462,15 +1523,11 @@ StepFunction_Skyfall:
 	ld hl, OBJECT_JUMP_HEIGHT
 	add hl, bc
 	ld [hl], 0
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], 16
+	ld a, 16 ; plus
+	call SetStepDuration60
 	call ObjectStep_IncAnonJumptableIndex
 .Fall:
-	ld hl, OBJECT_JUMP_HEIGHT
-	add hl, bc
-	inc [hl]
-	ld a, [hl]
+	call UpdateJumpHeight60 ; plus
 	ld d, $60
 	call Sine
 	ld a, h
@@ -1502,18 +1559,26 @@ StepFunction_GotBite:
 	dw .Run
 
 .Init:
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], 8
+	ld a, 8 ; plus
+	call SetStepDuration60
 	ld hl, OBJECT_SPRITE_Y_OFFSET
 	add hl, bc
 	ld [hl], 0
 	call ObjectStep_IncAnonJumptableIndex
 .Run:
-	ld hl, OBJECT_SPRITE_Y_OFFSET
+; plus: the bob used to toggle once per iteration, which is twice as fast at
+; 60 fps. Read it off the duration instead, so it keeps to one bob per 30 fps
+; frame in either mode.
+	ld hl, OBJECT_STEP_DURATION
 	add hl, bc
 	ld a, [hl]
-	xor 1
+	call CheckAlternateFrame60
+	ld a, 1
+	jr z, .got_offset
+	xor a
+.got_offset
+	ld hl, OBJECT_SPRITE_Y_OFFSET
+	add hl, bc
 	ld [hl], a
 	ld hl, OBJECT_STEP_DURATION
 	add hl, bc
@@ -1535,7 +1600,7 @@ StepFunction_RockSmash:
 	ld hl, OBJECT_STEP_DURATION
 	add hl, bc
 	ld a, [hl]
-	and %00000001
+	call CheckAlternateFrame60 ; plus
 	ld a, OBJECT_ACTION_STAND
 	jr z, .yes
 	ld a, OBJECT_ACTION_00
@@ -1549,7 +1614,7 @@ StepFunction_DigTo:
 	ld hl, OBJECT_STEP_DURATION
 	add hl, bc
 	ld a, [hl]
-	and %00000001
+	call CheckAlternateFrame60 ; plus
 	ld a, OBJECT_ACTION_SPIN
 	jr z, .yes
 	ld a, OBJECT_ACTION_SPIN_FLICKER
@@ -1682,9 +1747,8 @@ StepFunction_Turn:
 	add hl, bc
 	ld a, [hl]
 	ld [hl], 2
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], 2
+	ld a, 2 ; plus
+	call SetStepDuration60
 	call ObjectStep_IncAnonJumptableIndex
 .step1
 	ld hl, OBJECT_STEP_DURATION
@@ -1699,9 +1763,8 @@ StepFunction_Turn:
 	ld hl, OBJECT_DIRECTION
 	add hl, bc
 	ld [hl], a
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], 2
+	ld a, 2 ; plus
+	call SetStepDuration60
 	call ObjectStep_IncAnonJumptableIndex
 .step2
 	ld hl, OBJECT_STEP_DURATION
@@ -1819,7 +1882,7 @@ StepFunction_ScreenShake:
 .GetSign:
 	ld hl, OBJECT_1E
 	add hl, bc
-	and 1
+	call CheckAlternateFrame60 ; plus
 	ld a, [hl]
 	ret z
 	cpl
@@ -1848,9 +1911,8 @@ StepFunction_SkyfallTop:
 	ld hl, OBJECT_ACTION
 	add hl, bc
 	ld [hl], OBJECT_ACTION_SKYFALL
-	ld hl, OBJECT_STEP_DURATION
-	add hl, bc
-	ld [hl], 16
+	ld a, 16 ; plus
+	call SetStepDuration60
 	call ObjectStep_IncAnonJumptableIndex
 
 .Run:

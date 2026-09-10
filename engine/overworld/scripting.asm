@@ -2238,6 +2238,7 @@ Script_deactivatefacing:
 	call GetScriptByte
 	and a
 	jr z, .no_time
+	call ScaleScriptDelay60 ; plus
 	ld [wScriptDelay], a
 .no_time
 	ld a, SCRIPT_WAIT

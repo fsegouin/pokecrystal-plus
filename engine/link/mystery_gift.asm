@@ -25,6 +25,7 @@ DEF MESSAGE_PREFIX EQU $5a
 DEF NAME_CARD_PREFIX EQU $3c
 
 DoMysteryGift:
+	call PlusNormalSpeed ; plus
 	call ClearTilemap
 	call ClearSprites
 	call WaitBGMap

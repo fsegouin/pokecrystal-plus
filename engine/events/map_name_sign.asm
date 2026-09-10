@@ -40,7 +40,7 @@ InitMapNameSign::
 	jr z, .dont_do_map_sign
 
 ; Display for 60 frames
-	ld a, 60
+	call MapNameSignFrames60 ; plus
 	ld [wLandmarkSignTimer], a
 	call LoadMapNameSignGFX
 	call InitMapNameFrame
@@ -96,15 +96,30 @@ InitMapNameSign::
 	cp MAP_ROUTE_36_NATIONAL_PARK_GATE
 	ret
 
+; plus: the sign counts down once per overworld loop iteration, and the 60 fps
+; option runs that loop twice as often, so the count doubles to keep the sign
+; on screen for the same two seconds. Both the value stored and the two checks
+; that catch the first iterations of the countdown read it from here.
+MapNameSignFrames60:
+	ld a, [wOptions2]
+	bit FRAME_RATE_60_F, a
+	ld a, 60
+	ret z
+	add a
+	ret
+
 PlaceMapNameSign::
 	ld hl, wLandmarkSignTimer
 	ld a, [hl]
 	and a
 	jr z, .disappear
 	dec [hl]
-	cp 60
+	ld e, a ; plus: the count before the decrement
+	call MapNameSignFrames60 ; plus
+	cp e
 	ret z
-	cp 59
+	dec a
+	cp e
 	jr nz, .already_initialized
 	call InitMapNameFrame
 	call PlaceMapNameCenterAlign

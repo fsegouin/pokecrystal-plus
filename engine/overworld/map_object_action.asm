@@ -53,30 +53,13 @@ SetFacingStepAction:
 	add hl, bc
 ; plus: the counter advances once per overworld iteration and the top two bits
 ; of its cycle pick the sprite frame. At 60 fps there are twice as many
-; iterations per tile, so stretch the cycle from 16 to 32 to keep the legs
-; moving at the speed they do at 30 fps.
-	ld a, [wOptions2]
-	bit FRAME_RATE_60_F, a
-	ld a, [hl]
-	jr nz, .sixty
-	inc a
-	and %00001111
-	ld [hl], a
+; iterations per tile, so it only advances on half of them and the legs move at
+; the speed they do at 30 fps.
+	lb de, %00001111, 1 ; plus
+	call AdvanceStepFrame60
 
 	rrca
 	rrca
-	jr .got_frame
-
-.sixty
-	inc a
-	and %00011111
-	ld [hl], a
-
-	rrca
-	rrca
-	rrca
-
-.got_frame
 	maskbits NUM_DIRECTIONS
 	ld d, a
 
@@ -96,10 +79,8 @@ SetFacingSkyfall:
 
 	ld hl, OBJECT_STEP_FRAME
 	add hl, bc
-	ld a, [hl]
-	add 2
-	and %00001111
-	ld [hl], a
+	lb de, %00001111, 2 ; plus
+	call AdvanceStepFrame60
 
 	rrca
 	rrca
@@ -122,9 +103,9 @@ SetFacingBumpAction:
 
 	ld hl, OBJECT_STEP_FRAME
 	add hl, bc
-	inc [hl]
+	lb de, %00011111, 1 ; plus
+	call AdvanceStepFrame60
 
-	ld a, [hl]
 	rrca
 	rrca
 	rrca
@@ -157,7 +138,7 @@ SetFacingCounterclockwiseSpin2:
 CounterclockwiseSpinAction:
 ; Here, OBJECT_STEP_FRAME consists of two 2-bit components,
 ; using only bits 0,1 and 4,5.
-; bits 0,1 is a timer (4 overworld frames)
+; bits 0,1 is a timer (4 overworld frames, 8 with the 60 fps option on)
 ; bits 4,5 determines the facing - the direction is counterclockwise.
 	ld hl, OBJECT_STEP_FRAME
 	add hl, bc
@@ -169,8 +150,14 @@ CounterclockwiseSpinAction:
 	inc a
 	and %00001111
 	ld d, a
-	cp 4
-	jr c, .ok
+	ld a, 4 ; plus: iterations per facing, doubled at 60 fps
+	call ScaleDuration60
+	; plus: compare against the last in-range value so the test is >=, not ==.
+	; plus: toggling the frame rate mid-spin can leave a timer above the 30 fps
+	; plus: threshold, and an equality test would never catch it.
+	dec a
+	cp d
+	jr nc, .ok
 
 	ld d, 0
 	ld a, e
@@ -230,10 +217,8 @@ SetFacingBigDollSym:
 SetFacingBounce:
 	ld hl, OBJECT_STEP_FRAME
 	add hl, bc
-	ld a, [hl]
-	inc a
-	and %00001111
-	ld [hl], a
+	lb de, %00001111, 1 ; plus
+	call AdvanceStepFrame60
 	and %00001000
 	jr z, SetFacingFreezeBounce
 	ld hl, OBJECT_FACING
@@ -250,9 +235,8 @@ SetFacingFreezeBounce:
 SetFacingWeirdTree:
 	ld hl, OBJECT_STEP_FRAME
 	add hl, bc
-	ld a, [hl]
-	inc a
-	ld [hl], a
+	lb de, %00001111, 1 ; plus
+	call AdvanceStepFrame60
 	maskbits NUM_DIRECTIONS, 2
 	rrca
 	rrca
@@ -286,8 +270,8 @@ SetFacingBigDoll:
 SetFacingBoulderDust:
 	ld hl, OBJECT_STEP_FRAME
 	add hl, bc
-	inc [hl]
-	ld a, [hl]
+	lb de, %00000011, 1 ; plus
+	call AdvanceStepFrame60
 
 	ld hl, OBJECT_FACING
 	add hl, bc
@@ -303,8 +287,8 @@ SetFacingBoulderDust:
 SetFacingGrassShake:
 	ld hl, OBJECT_STEP_FRAME
 	add hl, bc
-	inc [hl]
-	ld a, [hl]
+	lb de, %00000111, 1 ; plus
+	call AdvanceStepFrame60
 	ld hl, OBJECT_FACING
 	add hl, bc
 	and 4
@@ -314,4 +298,38 @@ SetFacingGrassShake:
 	inc a
 .ok
 	ld [hl], a
+	ret
+
+; plus: an object's animation counter advances once per overworld iteration,
+; and the 60 fps option runs that loop twice as often. Bit 7 of the counter
+; marks which half of a 30 fps frame the current iteration is, so the counter
+; itself only moves on every other one and the animation keeps its speed. hl
+; points at the counter, d holds its wrap mask (with bit 7 clear) and e the
+; step to add. Returns the wrapped counter in a. Preserves bc, d and hl.
+AdvanceStepFrame60:
+	ld a, [wOptions2]
+	bit FRAME_RATE_60_F, a
+	jr z, .advance
+	ld a, [hl]
+	xor 1 << 7
+	ld [hl], a
+	and 1 << 7
+	jr nz, .hold
+
+.advance
+	ld a, [hl]
+	and d
+	add e
+	and d
+	ld e, a
+	ld a, [hl]
+	and 1 << 7
+	or e
+	ld [hl], a
+	ld a, e
+	ret
+
+.hold
+	ld a, [hl]
+	and d
 	ret

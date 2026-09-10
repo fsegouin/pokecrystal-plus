@@ -291,9 +291,11 @@ HDMATransfer_NoDI:
 	ld a, e
 	and $f0
 	ldh [rVDMA_DEST_LOW], a
-	; b = c | %10000000
-	ld a, c
+	; plus: b = (c - 1) | %10000000, so exactly c blocks are armed. Vanilla arms
+	; plus: c + 1 and aborts the last one below, which is only a legal abort
+	; plus: while the transfer is still running.
 	dec c
+	ld a, c
 	or $80
 	ld b, a
 	; d = $7f - c + 1
@@ -324,7 +326,12 @@ HDMATransfer_NoDI:
 	dec c
 	jr nz, .loop3
 	ld hl, rVDMA_LEN
+	; plus: a finished transfer reads $ff here. Clearing bit 7 of that does not
+	; plus: stop anything, it starts a fresh 2 KiB general purpose DMA into VRAM.
+	bit 7, [hl]
+	jr nz, .done
 	res 7, [hl]
+.done
 	ret
 
 HDMATransfer_WaitForScanline124:
@@ -348,9 +355,11 @@ _continue_HDMATransfer:
 	ld a, e
 	and $f0 ; high nybble
 	ldh [rVDMA_DEST_LOW], a
-	; e = c | %10000000
-	ld a, c
+	; plus: e = (c - 1) | %10000000, so exactly c blocks are armed. Vanilla arms
+	; plus: c + 1 and aborts the last one below, which is only a legal abort
+	; plus: while the transfer is still running.
 	dec c
+	ld a, c
 	or $80
 	ld e, a
 	; d = b - c + 1
@@ -388,7 +397,12 @@ _continue_HDMATransfer:
 	dec c
 	jr nz, .final_ly_loop
 	ld hl, rVDMA_LEN
+	; plus: a finished transfer reads $ff here. Clearing bit 7 of that does not
+	; plus: stop anything, it starts a fresh 2 KiB general purpose DMA into VRAM.
+	bit 7, [hl]
+	jr nz, .done
 	res 7, [hl]
+.done
 	ei
 
 	ret

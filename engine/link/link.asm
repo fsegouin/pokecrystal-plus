@@ -1,4 +1,5 @@
 LinkCommunications:
+	call PlusNormalSpeed ; plus
 	call ClearBGPalettes
 	ld c, 80
 	call DelayFrames
