@@ -13,7 +13,7 @@ VioletGymFalknerScript:
 	faceplayer
 	opentext
 	checkevent EVENT_BEAT_FALKNER
-	iftrue .FightDone
+	iftrue .Rematch ; plus: rematches
 	writetext FalknerIntroText
 	waitbutton
 	closetext
@@ -51,6 +51,19 @@ VioletGymFalknerScript:
 	waitbutton
 .NoRoomForMudSlap:
 	closetext
+	end
+
+; plus: rematch. The badge and the TM are handled under .FightDone, which this
+; branch skips, so a rematch only ever costs the battle.
+.Rematch:
+	farwritetext RematchOfferText
+	yesorno
+	iffalse .FightDone
+	closetext
+	winlosstext FalknerWinLossText, 0
+	loadtrainer FALKNER, FALKNER1
+	startbattle
+	reloadmapafterbattle
 	end
 
 VioletGymActivateRockets:

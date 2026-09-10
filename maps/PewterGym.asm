@@ -12,7 +12,7 @@ PewterGymBrockScript:
 	faceplayer
 	opentext
 	checkflag ENGINE_BOULDERBADGE
-	iftrue .FightDone
+	iftrue .Rematch ; plus: rematches
 	writetext BrockIntroText
 	waitbutton
 	closetext
@@ -36,6 +36,19 @@ PewterGymBrockScript:
 	writetext BrockFightDoneText
 	waitbutton
 	closetext
+	end
+
+; plus: rematch. The badge award sits on the path above, which this branch
+; skips, so a rematch only ever costs the battle.
+.Rematch:
+	farwritetext RematchOfferText
+	yesorno
+	iffalse .FightDone
+	closetext
+	winlosstext BrockWinLossText, 0
+	loadtrainer BROCK, BROCK1
+	startbattle
+	reloadmapafterbattle
 	end
 
 TrainerCamperJerry:

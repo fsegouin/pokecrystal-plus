@@ -15,7 +15,7 @@ SaffronGymSabrinaScript:
 	faceplayer
 	opentext
 	checkflag ENGINE_MARSHBADGE
-	iftrue .FightDone
+	iftrue .Rematch ; plus: rematches
 	writetext SabrinaIntroText
 	waitbutton
 	closetext
@@ -42,6 +42,19 @@ SaffronGymSabrinaScript:
 	writetext SabrinaFightDoneText
 	waitbutton
 	closetext
+	end
+
+; plus: rematch. The badge award sits on the path above, which this branch
+; skips, so a rematch only ever costs the battle.
+.Rematch:
+	farwritetext RematchOfferText
+	yesorno
+	iffalse .FightDone
+	closetext
+	winlosstext SabrinaWinLossText, 0
+	loadtrainer SABRINA, SABRINA1
+	startbattle
+	reloadmapafterbattle
 	end
 
 TrainerMediumRebecca:

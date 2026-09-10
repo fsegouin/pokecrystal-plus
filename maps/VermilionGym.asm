@@ -14,7 +14,7 @@ VermilionGymSurgeScript:
 	faceplayer
 	opentext
 	checkflag ENGINE_THUNDERBADGE
-	iftrue .FightDone
+	iftrue .Rematch ; plus: rematches
 	writetext LtSurgeIntroText
 	waitbutton
 	closetext
@@ -40,6 +40,19 @@ VermilionGymSurgeScript:
 	writetext LtSurgeFightDoneText
 	waitbutton
 	closetext
+	end
+
+; plus: rematch. The badge award sits on the path above, which this branch
+; skips, so a rematch only ever costs the battle.
+.Rematch:
+	farwritetext RematchOfferText
+	yesorno
+	iffalse .FightDone
+	closetext
+	winlosstext LtSurgeWinLossText, 0
+	loadtrainer LT_SURGE, LT_SURGE1
+	startbattle
+	reloadmapafterbattle
 	end
 
 TrainerGentlemanGregory:

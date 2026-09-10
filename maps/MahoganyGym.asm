@@ -16,7 +16,7 @@ MahoganyGymPryceScript:
 	faceplayer
 	opentext
 	checkevent EVENT_BEAT_PRYCE
-	iftrue .FightDone
+	iftrue .Rematch ; plus: rematches
 	writetext PryceText_Intro
 	waitbutton
 	closetext
@@ -48,6 +48,19 @@ MahoganyGymPryceScript:
 	writetext PryceText_IcyWindSpeech
 	waitbutton
 	closetext
+	end
+
+; plus: rematch. The badge and the TM are handled under .FightDone, which this
+; branch skips, so a rematch only ever costs the battle.
+.Rematch:
+	farwritetext RematchOfferText
+	yesorno
+	iffalse .FightDone
+	closetext
+	winlosstext PryceText_Impressed, 0
+	loadtrainer PRYCE, PRYCE1
+	startbattle
+	reloadmapafterbattle
 	end
 
 PryceScript_Defeat:

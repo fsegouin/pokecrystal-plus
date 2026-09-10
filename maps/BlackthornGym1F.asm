@@ -32,7 +32,7 @@ BlackthornGymClairScript:
 	checkflag ENGINE_RISINGBADGE
 	iftrue .AlreadyGotBadge
 	checkevent EVENT_BEAT_CLAIR
-	iftrue .FightDone
+	iftrue .Rematch ; plus: rematches
 	writetext ClairIntroText
 	waitbutton
 	closetext
@@ -63,7 +63,7 @@ BlackthornGymClairScript:
 
 .AlreadyGotBadge:
 	checkevent EVENT_GOT_TM24_DRAGONBREATH
-	iftrue .GotTM24
+	iftrue .RematchAfterTM ; plus: rematches
 	writetext BlackthornGymClairText_YouKeptMeWaiting
 	promptbutton
 	giveitem TM_DRAGONBREATH
@@ -88,6 +88,29 @@ BlackthornGymClairScript:
 	writetext BlackthornGymClairText_League
 	waitbutton
 	closetext
+	end
+
+; plus: rematch. Clair has two beaten branches, one before the Rising Badge
+; and one after the TM, so each gets its own offer and both share the battle.
+; Neither path awards the badge or the TM.
+.Rematch:
+	farwritetext RematchOfferText
+	yesorno
+	iftrue .StartRematch
+	sjump .FightDone
+
+.RematchAfterTM:
+	farwritetext RematchOfferText
+	yesorno
+	iftrue .StartRematch
+	sjump .GotTM24
+
+.StartRematch:
+	closetext
+	winlosstext ClairWinText, 0
+	loadtrainer CLAIR, CLAIR1
+	startbattle
+	reloadmapafterbattle
 	end
 
 TrainerCooltrainermPaul:

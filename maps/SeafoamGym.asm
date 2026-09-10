@@ -15,7 +15,7 @@ SeafoamGymBlaineScript:
 	faceplayer
 	opentext
 	checkflag ENGINE_VOLCANOBADGE
-	iftrue .FightDone
+	iftrue .Rematch ; plus: rematches
 	writetext BlaineIntroText
 	waitbutton
 	closetext
@@ -41,6 +41,19 @@ SeafoamGymBlaineScript:
 	writetext BlaineFightDoneText
 	waitbutton
 	closetext
+	end
+
+; plus: rematch. The badge award sits on the path above, which this branch
+; skips, so a rematch only ever costs the battle.
+.Rematch:
+	farwritetext RematchOfferText
+	yesorno
+	iffalse .FightDone
+	closetext
+	winlosstext BlaineWinLossText, 0
+	loadtrainer BLAINE, BLAINE1
+	startbattle
+	reloadmapafterbattle
 	end
 
 SeafoamGymGuideScript:

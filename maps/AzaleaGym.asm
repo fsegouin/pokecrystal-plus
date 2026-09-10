@@ -16,7 +16,7 @@ AzaleaGymBugsyScript:
 	faceplayer
 	opentext
 	checkevent EVENT_BEAT_BUGSY
-	iftrue .FightDone
+	iftrue .Rematch ; plus: rematches
 	writetext BugsyText_INeverLose
 	waitbutton
 	closetext
@@ -54,6 +54,19 @@ AzaleaGymBugsyScript:
 	waitbutton
 .NoRoomForFuryCutter:
 	closetext
+	end
+
+; plus: rematch. The badge and the TM are handled under .FightDone, which this
+; branch skips, so a rematch only ever costs the battle.
+.Rematch:
+	farwritetext RematchOfferText
+	yesorno
+	iffalse .FightDone
+	closetext
+	winlosstext BugsyText_ResearchIncomplete, 0
+	loadtrainer BUGSY, BUGSY1
+	startbattle
+	reloadmapafterbattle
 	end
 
 AzaleaGymActivateRockets:

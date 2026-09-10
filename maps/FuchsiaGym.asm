@@ -13,7 +13,7 @@ FuchsiaGym_MapScripts:
 
 FuchsiaGymJanineScript:
 	checkflag ENGINE_SOULBADGE
-	iftrue .FightDone
+	iftrue .Rematch ; plus: rematches
 	applymovement FUCHSIAGYM_JANINE, Movement_NinjaSpin
 	faceplayer
 	opentext
@@ -55,6 +55,23 @@ FuchsiaGymJanineScript:
 	writetext JanineText_ApplyMyself
 	waitbutton
 	closetext
+	end
+
+; plus: rematch. The badge and the TM are handled under .AfterBattle, which
+; this branch skips, so a rematch only ever costs the battle. Janine's script
+; turns to the player and opens the textbox after the beaten check, so this
+; branch does both itself.
+.Rematch:
+	faceplayer
+	opentext
+	farwritetext RematchOfferText
+	yesorno
+	iffalse .AfterBattle
+	closetext
+	winlosstext JanineText_ToughOne, 0
+	loadtrainer JANINE, JANINE1
+	startbattle
+	reloadmapafterbattle
 	end
 
 LassAliceScript:

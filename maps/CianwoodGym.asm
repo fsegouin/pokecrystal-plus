@@ -18,7 +18,7 @@ CianwoodGymChuckScript:
 	faceplayer
 	opentext
 	checkevent EVENT_BEAT_CHUCK
-	iftrue .FightDone
+	iftrue .Rematch ; plus: rematches
 	writetext ChuckIntroText1
 	waitbutton
 	closetext
@@ -71,6 +71,19 @@ CianwoodGymChuckScript:
 	waitbutton
 .BagFull:
 	closetext
+	end
+
+; plus: rematch. The badge and the TM are handled under .FightDone, which this
+; branch skips, so a rematch only ever costs the battle.
+.Rematch:
+	farwritetext RematchOfferText
+	yesorno
+	iffalse .FightDone
+	closetext
+	winlosstext ChuckLossText, 0
+	loadtrainer CHUCK, CHUCK1
+	startbattle
+	reloadmapafterbattle
 	end
 
 CianwoodGymActivateRockets:

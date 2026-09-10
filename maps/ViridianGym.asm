@@ -11,7 +11,7 @@ ViridianGymBlueScript:
 	faceplayer
 	opentext
 	checkflag ENGINE_EARTHBADGE
-	iftrue .FightDone
+	iftrue .Rematch ; plus: rematches
 	writetext LeaderBlueBeforeText
 	waitbutton
 	closetext
@@ -34,6 +34,19 @@ ViridianGymBlueScript:
 	writetext LeaderBlueEpilogueText
 	waitbutton
 	closetext
+	end
+
+; plus: rematch. The badge award sits on the path above, which this branch
+; skips, so a rematch only ever costs the battle.
+.Rematch:
+	farwritetext RematchOfferText
+	yesorno
+	iffalse .FightDone
+	closetext
+	winlosstext LeaderBlueWinText, 0
+	loadtrainer BLUE, BLUE1
+	startbattle
+	reloadmapafterbattle
 	end
 
 ViridianGymGuideScript:

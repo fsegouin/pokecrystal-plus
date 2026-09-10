@@ -34,6 +34,10 @@ the exact build they came from.
 Keys: arrows, A = a, B = s, Start = Enter, Select = Backspace, Space = turbo.
 `tests/states/` is gitignored.
     .venv/bin/python tests/test_exp.py          # catch-up EXP booster
+    .venv/bin/python tests/test_rematch.py      # trainer and gym leader rematches
 `Crystal.farcall(symbol)` runs one ROM routine on its own from a cold boot, so
 a feature whose inputs and outputs are all memory can be checked without
 reaching the situation that would normally call it. `test_exp.py` uses it.
+`test_rematch.py` needs no emulator at all: it decodes the assembled script
+bytecode out of the ROM using an opcode table parsed from
+`macros/scripts/events.asm`.

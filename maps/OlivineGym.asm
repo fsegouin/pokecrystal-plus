@@ -11,7 +11,7 @@ OlivineGymJasmineScript:
 	faceplayer
 	opentext
 	checkevent EVENT_BEAT_JASMINE
-	iftrue .FightDone
+	iftrue .Rematch ; plus: rematches
 	writetext Jasmine_SteelTypeIntro
 	waitbutton
 	closetext
@@ -45,6 +45,19 @@ OlivineGymJasmineScript:
 	waitbutton
 .NoRoomForIronTail:
 	closetext
+	end
+
+; plus: rematch. The badge and the TM are handled under .FightDone, which this
+; branch skips, so a rematch only ever costs the battle.
+.Rematch:
+	farwritetext RematchOfferText
+	yesorno
+	iffalse .FightDone
+	closetext
+	winlosstext Jasmine_BetterTrainer, 0
+	loadtrainer JASMINE, JASMINE1
+	startbattle
+	reloadmapafterbattle
 	end
 
 OlivineGymActivateRockets:

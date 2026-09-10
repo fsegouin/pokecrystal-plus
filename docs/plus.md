@@ -8,6 +8,7 @@ and distributed as a BPS patch against the vanilla ROM.
 | Wild encounter randomizer (tiered / untiered shuffle, or chaos) | Scientist, Elm's Lab | done |
 | Trainer roster randomizer | Scientist, Cherrygrove Pokémon Center | done |
 | Catch-up EXP booster | Scientist, Celadon Café | done |
+| Trainer and gym leader rematches | always on | done |
 
 Scripted encounters (gifts, in-game trades, statics, roamers, Bug Contest)
 are never randomized. The starter is the one deliberate exception.
@@ -92,6 +93,23 @@ Every place vanilla code is modified. Keep this current.
 | `main.asm` | 690, `"Plus"` section | catch-up EXP | `INCLUDE "engine/plus/exp.asm"` |
 | `engine/battle/core.asm` | 7116, `GiveExperiencePoints` | catch-up EXP | `farcall PlusCatchUpExpBoost` after the Lucky Egg boost |
 | `maps/CeladonCafe.asm` | 7, 90, 218, 297 | catch-up EXP | object const, toggle script, five texts, object at (9, 1) |
+| `engine/events/trainer_scripts.asm` | 4, 38 | rematches | `TalkToTrainerScript` branches to `OfferRematchScript`; shared `RematchOfferText` |
+| `maps/VioletGym.asm` | 16 | rematches | `.Rematch` branch off the beaten check |
+| `maps/AzaleaGym.asm` | 19 | rematches | `.Rematch` branch off the beaten check |
+| `maps/GoldenrodGym.asm` | 25 | rematches | `.Rematch` branch, plus `.FightDoneTextboxOpen` re-entry |
+| `maps/EcruteakGym.asm` | 28 | rematches | `.Rematch` branch off the beaten check |
+| `maps/CianwoodGym.asm` | 21 | rematches | `.Rematch` branch off the beaten check |
+| `maps/OlivineGym.asm` | 14 | rematches | `.Rematch` branch off the beaten check |
+| `maps/MahoganyGym.asm` | 19 | rematches | `.Rematch` branch off the beaten check |
+| `maps/BlackthornGym1F.asm` | 35, 66 | rematches | `.Rematch` and `.RematchAfterTM`, sharing `.StartRematch` |
+| `maps/PewterGym.asm` | 15 | rematches | `.Rematch` branch off the badge check |
+| `maps/CeruleanGym.asm` | 63 | rematches | `.Rematch` branch off the badge check |
+| `maps/VermilionGym.asm` | 17 | rematches | `.Rematch` branch off the badge check |
+| `maps/CeladonGym.asm` | 18 | rematches | `.Rematch` branch off the badge check |
+| `maps/FuchsiaGym.asm` | 16 | rematches | `.Rematch` branch; faces the player and opens the textbox itself |
+| `maps/SaffronGym.asm` | 18 | rematches | `.Rematch` branch off the badge check |
+| `maps/SeafoamGym.asm` | 18 | rematches | `.Rematch` branch off the badge check (Blaine's gym) |
+| `maps/ViridianGym.asm` | 14 | rematches | `.Rematch` branch off the badge check |
 
 ## Design notes
 
@@ -178,4 +196,7 @@ have learned at that level.
 **Catch-up EXP.** After the Lucky Egg check, each recipient whose level is
 below the fainted enemy's gets ×1.5 per started 3-level gap
 (1.5^(1+⌊gap/3⌋)), clamped at 65535.
+
+**Rematches.** `AlreadyBeatenTrainerScript` offers a rematch to every map
+trainer; each gym script gets a rematch branch that skips the badge and TM.
 

@@ -60,7 +60,7 @@ CeruleanGymMistyScript:
 	faceplayer
 	opentext
 	checkflag ENGINE_CASCADEBADGE
-	iftrue .FightDone
+	iftrue .Rematch ; plus: rematches
 	writetext MistyIntroText
 	waitbutton
 	closetext
@@ -81,6 +81,19 @@ CeruleanGymMistyScript:
 	writetext MistyFightDoneText
 	waitbutton
 	closetext
+	end
+
+; plus: rematch. The badge award sits on the path above, which this branch
+; skips, so a rematch only ever costs the battle.
+.Rematch:
+	farwritetext RematchOfferText
+	yesorno
+	iffalse .FightDone
+	closetext
+	winlosstext MistyWinLossText, 0
+	loadtrainer MISTY, MISTY1
+	startbattle
+	reloadmapafterbattle
 	end
 
 TrainerSwimmerfDiana:

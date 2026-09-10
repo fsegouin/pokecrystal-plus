@@ -22,7 +22,7 @@ GoldenrodGymNoop2Scene:
 GoldenrodGymWhitneyScript:
 	faceplayer
 	checkevent EVENT_BEAT_WHITNEY
-	iftrue .FightDone
+	iftrue .Rematch ; plus: rematches
 	opentext
 	writetext WhitneyBeforeText
 	waitbutton
@@ -40,6 +40,7 @@ GoldenrodGymWhitneyScript:
 	setevent EVENT_BEAT_LASS_BRIDGET
 .FightDone:
 	opentext
+.FightDoneTextboxOpen: ; plus: the rematch branch already has the textbox open
 	checkevent EVENT_MADE_WHITNEY_CRY
 	iffalse .StoppedCrying
 	writetext WhitneyYouMeanieText
@@ -77,6 +78,21 @@ GoldenrodGymWhitneyScript:
 	waitbutton
 .NoRoomForAttract:
 	closetext
+	end
+
+; plus: rematch. The badge and the TM are handled under .FightDone, which this
+; branch skips, so a rematch only ever costs the battle. Whitney's script opens
+; the textbox after the beaten check, so this branch opens it itself.
+.Rematch:
+	opentext
+	farwritetext RematchOfferText
+	yesorno
+	iffalse .FightDoneTextboxOpen
+	closetext
+	winlosstext WhitneyShouldntBeSoSeriousText, 0
+	loadtrainer WHITNEY, WHITNEY1
+	startbattle
+	reloadmapafterbattle
 	end
 
 GoldenrodGymActivateRockets:

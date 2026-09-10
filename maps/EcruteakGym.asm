@@ -25,7 +25,7 @@ EcruteakGymMortyScript:
 	faceplayer
 	opentext
 	checkevent EVENT_BEAT_MORTY
-	iftrue .FightDone
+	iftrue .Rematch ; plus: rematches
 	writetext MortyIntroText
 	waitbutton
 	closetext
@@ -66,6 +66,19 @@ EcruteakGymMortyScript:
 	waitbutton
 .NoRoomForShadowBall:
 	closetext
+	end
+
+; plus: rematch. The badge and the TM are handled under .FightDone, which this
+; branch skips, so a rematch only ever costs the battle.
+.Rematch:
+	farwritetext RematchOfferText
+	yesorno
+	iffalse .FightDone
+	closetext
+	winlosstext MortyWinLossText, 0
+	loadtrainer MORTY, MORTY1
+	startbattle
+	reloadmapafterbattle
 	end
 
 EcruteakGymActivateRockets:

@@ -15,7 +15,7 @@ CeladonGymErikaScript:
 	faceplayer
 	opentext
 	checkflag ENGINE_RAINBOWBADGE
-	iftrue .FightDone
+	iftrue .Rematch ; plus: rematches
 	writetext ErikaBeforeBattleText
 	waitbutton
 	closetext
@@ -45,6 +45,19 @@ CeladonGymErikaScript:
 	writetext ErikaAfterBattleText
 	waitbutton
 	closetext
+	end
+
+; plus: rematch. The badge and the TM are handled under .FightDone, which this
+; branch skips, so a rematch only ever costs the battle.
+.Rematch:
+	farwritetext RematchOfferText
+	yesorno
+	iffalse .FightDone
+	closetext
+	winlosstext ErikaBeatenText, 0
+	loadtrainer ERIKA, ERIKA1
+	startbattle
+	reloadmapafterbattle
 	end
 
 TrainerLassMichelle:
