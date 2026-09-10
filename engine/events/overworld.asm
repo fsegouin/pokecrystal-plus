@@ -1471,6 +1471,9 @@ FishFunction:
 	ld a, d
 	and a
 	jr z, .nonibble
+	ld b, a ; plus: shuffle whatever took the hook
+	farcall PlusMapWildSpecies ; plus:
+	ld a, b ; plus:
 	ld [wTempWildMonSpecies], a
 	ld a, e
 	ld [wCurPartyLevel], a

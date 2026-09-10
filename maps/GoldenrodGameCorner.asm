@@ -167,6 +167,8 @@ GoldenrodGameCornerPrizeMonVendorScript:
 .loop
 	writetext GoldenrodGameCornerPrizeVendorWhichPrizeText
 	special DisplayCoinCaseBalance
+	setval 0 ; plus: Goldenrod prize list
+	special PlusBuildPrizeMenu ; plus:
 	loadmenu .MenuHeader
 	verticalmenu
 	closewindow
@@ -180,16 +182,20 @@ GoldenrodGameCornerPrizeMonVendorScript:
 	ifequal HAVE_LESS, GoldenrodGameCornerPrizeVendor_NotEnoughCoinsScript
 	readvar VAR_PARTYCOUNT
 	ifequal PARTY_LENGTH, GoldenrodGameCornerPrizeMonVendor_NoRoomForPrizeScript
-	getmonname STRING_BUFFER_3, ABRA
+	setval ABRA ; plus: the prize can be shuffled, so settle on it first
+	special PlusMapPrizeMon ; plus:
+	getmonname STRING_BUFFER_3, 0 ; plus: name what is really on offer
 	scall GoldenrodGameCornerPrizeVendor_ConfirmPurchaseScript
 	iffalse GoldenrodGameCornerPrizeVendor_CancelPurchaseScript
 	waitsfx
 	playsound SFX_TRANSACTION
 	writetext GoldenrodGameCornerPrizeVendorHereYouGoText
 	waitbutton
-	setval ABRA
+	special PlusRecallMappedMon ; plus: the yes/no prompt used wScriptVar
 	special GameCornerPrizeMonCheckDex
-	givepoke ABRA, 5
+	loadmem wCurPartyLevel, 5 ; plus: the level PlusGiveScriptMon hands out
+	loadmem wCurItem, NO_ITEM ; plus:
+	special PlusGiveScriptMon ; plus: givepoke cannot take a variable species
 	takecoins GOLDENRODGAMECORNER_ABRA_COINS
 	sjump .loop
 
@@ -198,16 +204,20 @@ GoldenrodGameCornerPrizeMonVendorScript:
 	ifequal HAVE_LESS, GoldenrodGameCornerPrizeVendor_NotEnoughCoinsScript
 	readvar VAR_PARTYCOUNT
 	ifequal PARTY_LENGTH, GoldenrodGameCornerPrizeMonVendor_NoRoomForPrizeScript
-	getmonname STRING_BUFFER_3, CUBONE
+	setval CUBONE ; plus: the prize can be shuffled, so settle on it first
+	special PlusMapPrizeMon ; plus:
+	getmonname STRING_BUFFER_3, 0 ; plus: name what is really on offer
 	scall GoldenrodGameCornerPrizeVendor_ConfirmPurchaseScript
 	iffalse GoldenrodGameCornerPrizeVendor_CancelPurchaseScript
 	waitsfx
 	playsound SFX_TRANSACTION
 	writetext GoldenrodGameCornerPrizeVendorHereYouGoText
 	waitbutton
-	setval CUBONE
+	special PlusRecallMappedMon ; plus: the yes/no prompt used wScriptVar
 	special GameCornerPrizeMonCheckDex
-	givepoke CUBONE, 15
+	loadmem wCurPartyLevel, 15 ; plus: the level PlusGiveScriptMon hands out
+	loadmem wCurItem, NO_ITEM ; plus:
+	special PlusGiveScriptMon ; plus: givepoke cannot take a variable species
 	takecoins GOLDENRODGAMECORNER_CUBONE_COINS
 	sjump .loop
 
@@ -216,32 +226,29 @@ GoldenrodGameCornerPrizeMonVendorScript:
 	ifequal HAVE_LESS, GoldenrodGameCornerPrizeVendor_NotEnoughCoinsScript
 	readvar VAR_PARTYCOUNT
 	ifequal PARTY_LENGTH, GoldenrodGameCornerPrizeMonVendor_NoRoomForPrizeScript
-	getmonname STRING_BUFFER_3, WOBBUFFET
+	setval WOBBUFFET ; plus: the prize can be shuffled, so settle on it first
+	special PlusMapPrizeMon ; plus:
+	getmonname STRING_BUFFER_3, 0 ; plus: name what is really on offer
 	scall GoldenrodGameCornerPrizeVendor_ConfirmPurchaseScript
 	iffalse GoldenrodGameCornerPrizeVendor_CancelPurchaseScript
 	waitsfx
 	playsound SFX_TRANSACTION
 	writetext GoldenrodGameCornerPrizeVendorHereYouGoText
 	waitbutton
-	setval WOBBUFFET
+	special PlusRecallMappedMon ; plus: the yes/no prompt used wScriptVar
 	special GameCornerPrizeMonCheckDex
-	givepoke WOBBUFFET, 15
+	loadmem wCurPartyLevel, 15 ; plus: the level PlusGiveScriptMon hands out
+	loadmem wCurItem, NO_ITEM ; plus:
+	special PlusGiveScriptMon ; plus: givepoke cannot take a variable species
 	takecoins GOLDENRODGAMECORNER_WOBBUFFET_COINS
 	sjump .loop
 
 .MenuHeader:
 	db MENU_BACKUP_TILES ; flags
 	menu_coords 0, 2, 17, TEXTBOX_Y - 1
-	dw .MenuData
+	dw wPlusPrizeMenuData ; plus: the rows name the shuffled species
 	db 1 ; default option
 
-.MenuData:
-	db STATICMENU_CURSOR ; flags
-	db 4 ; items
-	db "ABRA        100@"
-	db "CUBONE      800@"
-	db "WOBBUFFET  1500@"
-	db "CANCEL@"
 
 GoldenrodGameCornerPharmacistScript:
 	faceplayer

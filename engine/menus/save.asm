@@ -607,6 +607,7 @@ TryLoadSaveFile:
 	call SaveBackupPlayerData
 	call SaveBackupPokemonData
 	call SaveBackupChecksum
+	farcall PlusBuildWildMaps ; plus: wPlusSeed is back, so rebuild the maps
 	and a
 	ret
 
@@ -624,6 +625,7 @@ TryLoadSaveFile:
 	call SavePlayerData
 	call SavePokemonData
 	call SaveChecksum
+	farcall PlusBuildWildMaps ; plus: same rebuild for the backup save
 	and a
 	ret
 

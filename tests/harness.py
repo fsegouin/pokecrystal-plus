@@ -25,6 +25,10 @@ ROM = os.path.join(ROOT, "pokecrystal.gbc")
 SYM = os.path.join(ROOT, "pokecrystal.sym")
 STATES = os.path.join(ROOT, "tests", "states")
 
+# MBC3 with a battery: four 8 KiB SRAM banks. PyBoy reads exactly this
+# many bytes out of ram_file, so a blank battery has to be full length.
+SRAM_SIZE = 4 * 8 * 1024
+
 # pb.memory[bank, addr] is valid below $E000; OAM, I/O and HRAM above it must be
 # indexed without a bank, and .sym reports them as bank 00.
 BANKED_LIMIT = 0xE000
@@ -49,7 +53,10 @@ class Crystal:
         self.syms = load_symbols(os.path.splitext(rom)[0] + ".sym")
         # Read into a buffer so the handle closes deterministically; PyBoy only
         # needs a file-like object.
-        ram = None
+        # Always hand PyBoy a buffer. With ram_file=None it derives a battery
+        # file next to the ROM, so a stray pokecrystal.gbc.ram silently changes
+        # where a "new game" starts.
+        ram = io.BytesIO(bytes(SRAM_SIZE))
         if sav:
             with open(sav, "rb") as f:
                 ram = io.BytesIO(f.read())

@@ -183,3 +183,13 @@ SpecialsPointers::
 	add_special InitialSetDSTFlag
 	add_special InitialClearDSTFlag
 	add_special UnusedDummySpecial ; unused
+
+; plus: wild randomizer, see docs/plus.md
+	add_special PlusMapPrizeMon
+	add_special PlusMapStarterMon
+	add_special PlusRecallMappedMon
+	add_special PlusGiveScriptMon
+	add_special PlusCheckWildOn
+	add_special PlusSetWildMode
+	add_special PlusGenerateSeed
+	add_special PlusBuildPrizeMenu ; plus:

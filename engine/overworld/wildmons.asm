@@ -29,6 +29,12 @@ FindNest:
 ; Parameters:
 ; e: 0 = Johto, 1 = Kanto
 ; wNamedObjectIndex: species
+	farcall PlusUnmapNestSpecies ; plus: the tables below are still vanilla
+	call .Scan ; plus:
+	farcall PlusMapNestSpecies ; plus:
+	ret ; plus:
+
+.Scan: ; plus:
 	hlcoord 0, 0
 	ld bc, SCREEN_AREA
 	xor a
@@ -317,6 +323,10 @@ ChooseWildEncounter:
 	ld a, b
 	ld [wCurPartyLevel], a
 	ld b, [hl]
+	; plus: a still holds the level, which is what the bug above validates
+	push af ; plus:
+	farcall PlusMapWildSpecies ; plus:
+	pop af ; plus:
 	call ValidateTempWildMonSpecies
 	jr c, .nowildbattle
 

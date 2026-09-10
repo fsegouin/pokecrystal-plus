@@ -7,6 +7,12 @@ PyBoy-driven checks for Pokémon Crystal+ features. Not part of `make`.
     .venv/bin/python tests/harness.py           # smoke test
     .venv/bin/python tests/test_wild.py         # per-feature scripts (added per phase)
 
+`test_wild.py` needs no save state. It boots the ROM, mashes through the new
+game flow once, and from there calls the routines under test directly: it
+parks the CPU in a two byte loop in HRAM, sets the registers and program
+counter, and reads the result out of WRAM. That covers the map builder and the
+vanilla encounter routines at their hook sites without walking to a route.
+
 ## Hand-offs: battery saves and states
 
 Many checks need the game at a particular point (in tall grass, facing a

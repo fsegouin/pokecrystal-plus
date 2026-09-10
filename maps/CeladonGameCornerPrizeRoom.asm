@@ -131,6 +131,8 @@ CeladonGameCornerPrizeRoomPokemonVendor:
 .loop
 	writetext CeladonPrizeRoom_AskWhichPrizeText
 	special DisplayCoinCaseBalance
+	setval 1 ; plus: Celadon prize list
+	special PlusBuildPrizeMenu ; plus:
 	loadmenu .MenuHeader
 	verticalmenu
 	closewindow
@@ -144,16 +146,20 @@ CeladonGameCornerPrizeRoomPokemonVendor:
 	ifequal HAVE_LESS, CeladonPrizeRoom_notenoughcoins
 	readvar VAR_PARTYCOUNT
 	ifequal PARTY_LENGTH, CeladonPrizeRoom_notenoughroom
-	getmonname STRING_BUFFER_3, PIKACHU
+	setval PIKACHU ; plus: the prize can be shuffled, so settle on it first
+	special PlusMapPrizeMon ; plus:
+	getmonname STRING_BUFFER_3, 0 ; plus: name what is really on offer
 	scall CeladonPrizeRoom_askbuy
 	iffalse CeladonPrizeRoom_CancelPurchaseScript
 	waitsfx
 	playsound SFX_TRANSACTION
 	writetext CeladonPrizeRoom_HereYouGoText
 	waitbutton
-	setval PIKACHU
+	special PlusRecallMappedMon ; plus: the yes/no prompt used wScriptVar
 	special GameCornerPrizeMonCheckDex
-	givepoke PIKACHU, 25
+	loadmem wCurPartyLevel, 25 ; plus: the level PlusGiveScriptMon hands out
+	loadmem wCurItem, NO_ITEM ; plus:
+	special PlusGiveScriptMon ; plus: givepoke cannot take a variable species
 	takecoins CELADONGAMECORNERPRIZEROOM_PIKACHU_COINS
 	sjump .loop
 
@@ -162,16 +168,20 @@ CeladonGameCornerPrizeRoomPokemonVendor:
 	ifequal HAVE_LESS, CeladonPrizeRoom_notenoughcoins
 	readvar VAR_PARTYCOUNT
 	ifequal PARTY_LENGTH, CeladonPrizeRoom_notenoughroom
-	getmonname STRING_BUFFER_3, PORYGON
+	setval PORYGON ; plus: the prize can be shuffled, so settle on it first
+	special PlusMapPrizeMon ; plus:
+	getmonname STRING_BUFFER_3, 0 ; plus: name what is really on offer
 	scall CeladonPrizeRoom_askbuy
 	iffalse CeladonPrizeRoom_CancelPurchaseScript
 	waitsfx
 	playsound SFX_TRANSACTION
 	writetext CeladonPrizeRoom_HereYouGoText
 	waitbutton
-	setval PORYGON
+	special PlusRecallMappedMon ; plus: the yes/no prompt used wScriptVar
 	special GameCornerPrizeMonCheckDex
-	givepoke PORYGON, 15
+	loadmem wCurPartyLevel, 15 ; plus: the level PlusGiveScriptMon hands out
+	loadmem wCurItem, NO_ITEM ; plus:
+	special PlusGiveScriptMon ; plus: givepoke cannot take a variable species
 	takecoins CELADONGAMECORNERPRIZEROOM_PORYGON_COINS
 	sjump .loop
 
@@ -180,32 +190,29 @@ CeladonGameCornerPrizeRoomPokemonVendor:
 	ifequal HAVE_LESS, CeladonPrizeRoom_notenoughcoins
 	readvar VAR_PARTYCOUNT
 	ifequal PARTY_LENGTH, CeladonPrizeRoom_notenoughroom
-	getmonname STRING_BUFFER_3, LARVITAR
+	setval LARVITAR ; plus: the prize can be shuffled, so settle on it first
+	special PlusMapPrizeMon ; plus:
+	getmonname STRING_BUFFER_3, 0 ; plus: name what is really on offer
 	scall CeladonPrizeRoom_askbuy
 	iffalse CeladonPrizeRoom_CancelPurchaseScript
 	waitsfx
 	playsound SFX_TRANSACTION
 	writetext CeladonPrizeRoom_HereYouGoText
 	waitbutton
-	setval LARVITAR
+	special PlusRecallMappedMon ; plus: the yes/no prompt used wScriptVar
 	special GameCornerPrizeMonCheckDex
-	givepoke LARVITAR, 40
+	loadmem wCurPartyLevel, 40 ; plus: the level PlusGiveScriptMon hands out
+	loadmem wCurItem, NO_ITEM ; plus:
+	special PlusGiveScriptMon ; plus: givepoke cannot take a variable species
 	takecoins CELADONGAMECORNERPRIZEROOM_LARVITAR_COINS
 	sjump .loop
 
 .MenuHeader:
 	db MENU_BACKUP_TILES ; flags
 	menu_coords 0, 2, 17, TEXTBOX_Y - 1
-	dw .MenuData
+	dw wPlusPrizeMenuData ; plus: the rows name the shuffled species
 	db 1 ; default option
 
-.MenuData:
-	db STATICMENU_CURSOR ; flags
-	db 4 ; items
-	db "PIKACHU    {d:CELADONGAMECORNERPRIZEROOM_PIKACHU_COINS}@"
-	db "PORYGON    {d:CELADONGAMECORNERPRIZEROOM_PORYGON_COINS}@"
-	db "LARVITAR   {d:CELADONGAMECORNERPRIZEROOM_LARVITAR_COINS}@"
-	db "CANCEL@"
 
 CeladonGameCornerPrizeRoomGentlemanText:
 	text "I wanted PORYGON,"

@@ -62,6 +62,7 @@ NewGame:
 	xor a
 	ld [wDebugFlags], a
 	call ResetWRAM
+	farcall PlusInitNewGame ; plus: fresh pattern, every feature off
 	call NewGame_ClearTilemapEtc
 	call PlayerProfileSetup
 	call OakSpeech

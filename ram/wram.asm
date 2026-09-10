@@ -2199,6 +2199,21 @@ wd036:: ds 2
 
 SECTION UNION "Miscellaneous WRAM 1", WRAMX
 
+; plus: the Game Corner prize menu, built at run time because the species on
+; offer are shuffled. Same shape as a MenuData block in ROM (flags, row count,
+; then one "@"-terminated row each), so the map's menu header can point
+; straight at it, the way the start menu points at wMenuItemsList. Only live
+; while that menu is open, so it overlays the rest of this union.
+wPlusPrizeMenuData::
+wPlusPrizeMenuFlags:: db
+wPlusPrizeMenuCount:: db
+wPlusPrizeMenuRows:: ds 3 * 16 ; "NAME       NNNN@"
+wPlusPrizeMenuCancel:: ds 7    ; "CANCEL@"
+wPlusPrizeMenuDataEnd::
+
+
+SECTION UNION "Miscellaneous WRAM 1", WRAMX
+
 ; Every previous SECTION UNION takes up 60 or fewer bytes,
 ; except the initial "mon buffer" one.
 	ds 60
@@ -3759,8 +3774,22 @@ SECTION "Plus RAM", WRAMX
 
 ; plus: species permutation for the wild randomizer, rebuilt from wPlusSeed
 ; on load. Indexed by species id (entry 0 unused).
+; wPlusWildInverseMap doubles as the shuffle scratch buffer while the maps
+; are being built; it is filled in properly once the forward map is final.
 wPlusWildMap::        ds NUM_POKEMON + 1
 wPlusWildInverseMap:: ds NUM_POKEMON + 1
+
+; plus: deterministic RNG state, reset from wPlusSeed before every rebuild
+wPlusRandState:: dw
+
+; plus: the three PlusTierStarter entries on offer in Elm's lab this run
+wPlusStarterSlots:: ds 3
+
+; plus: the species a prize or starter script settled on, so the mon handed
+; over is the one whose name and picture were shown
+wPlusMappedSpecies:: db
+
+
 
 
 SECTION "Stack RAM", WRAMX

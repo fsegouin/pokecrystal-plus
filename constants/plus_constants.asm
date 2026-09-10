@@ -18,3 +18,14 @@ DEF PLUS_WILD_MODE_SHIFT EQU PLUS_WILD_MODE_LO_F
 	const PLUS_WILD_MODE_UNTIERED ; 1 - permute across all tiers as one list
 	const PLUS_WILD_MODE_CHAOS    ; 2 - fresh roll per encounter, no permutation
 DEF NUM_PLUS_WILD_MODES EQU const_value
+
+; PlusSetWildMode takes a mode in wScriptVar, or this to switch the wild
+; randomizer off. Any value at or above NUM_PLUS_WILD_MODES turns it off.
+DEF PLUS_WILD_SET_OFF EQU NUM_PLUS_WILD_MODES
+
+; PlusMapStarterMon slots, in the order the poke balls sit on Elm's table
+	const_def
+	const PLUS_STARTER_LEFT   ; 0 - Cyndaquil's ball
+	const PLUS_STARTER_MIDDLE ; 1 - Totodile's ball
+	const PLUS_STARTER_RIGHT  ; 2 - Chikorita's ball
+DEF NUM_PLUS_STARTERS EQU const_value

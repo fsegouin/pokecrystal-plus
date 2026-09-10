@@ -184,6 +184,11 @@ SelectTreeMon:
 	jr z, NoTreeMon
 
 	ld a, [hli]
+	push hl ; plus: shuffle the headbutt and rock smash species
+	ld b, a ; plus:
+	farcall PlusMapWildSpecies ; plus:
+	ld a, b ; plus:
+	pop hl ; plus:
 	ld [wTempWildMonSpecies], a
 	ld a, [hl]
 	ld [wCurPartyLevel], a

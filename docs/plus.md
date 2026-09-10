@@ -5,11 +5,7 @@ and distributed as a BPS patch against the vanilla ROM.
 
 | Feature | Toggle | Status |
 |---|---|---|
-| Wild encounter randomizer (tiered / untiered shuffle, or chaos) | Scientist, Elm's Lab | planned |
-| Trainer roster randomizer | Scientist, Cherrygrove Pokémon Center | planned |
-| Catch-up EXP booster | Scientist, Celadon Café | planned |
-| Trainer and gym leader rematches | always on | planned |
-| 60 fps overworld | Options, SELECT sub-page | planned |
+| Wild encounter randomizer (tiered / untiered shuffle, or chaos) | Scientist, Elm's Lab | done |
 
 Scripted encounters (gifts, in-game trades, statics, roamers, Bug Contest)
 are never randomized. The starter is the one deliberate exception.
@@ -55,6 +51,7 @@ hook registry below is the complete list either way.
 | `wPlusSeed` (2) | saved; carved from padding before `wEventFlags` | wild shuffle seed, 0 = none yet |
 | `wPlusFlags` (1) | saved; same carve-out | bit 0 wild on · bits 1-2 mode · bit 3 trainers · bit 4 exp boost |
 | `wPlusWildMap`, `wPlusWildInverseMap` (252 each) | WRAMX bank 2, `"Plus RAM"` | rebuilt from the seed on load; not saved |
+| `wPlusRandState` (2), `wPlusStarterSlots` (3), `wPlusMappedSpecies` (1) | WRAMX bank 2, `"Plus RAM"` | build scratch and script hand-off; not saved |
 | `FRAME_RATE_60_F` | `wOptions2` bit 1 | saved with the other options |
 | ROM code and data | `"Plus"` section, bank `$7f` | ~15 KB free below the Stadium checksums |
 
@@ -75,6 +72,18 @@ Every place vanilla code is modified. Keep this current.
 | `includes.asm` | constants | storage | `plus_constants.asm` |
 | `Makefile` | `.PHONY`, after `tools:` | packaging | `patch` target, vanilla ROM rule |
 | `.gitignore` | end of file | packaging | venv, states, local build artifacts |
+| `data/events/special_pointers.asm` | end of table | wild | seven `Plus*` specials |
+| `engine/overworld/wildmons.asm` | 32-37 | wild | `FindNest` wraps its scan in the inverse map |
+| `engine/overworld/wildmons.asm` | 326-329 | wild | `ChooseWildEncounter` maps the species it just read |
+| `engine/events/overworld.asm` | 1474-1476 | wild | `.goodtofish` maps the species `Fish` returned |
+| `engine/events/treemons.asm` | 187-191 | wild | `SelectTreeMon` maps the species before storing it |
+| `engine/menus/intro_menu.asm` | 65 | wild | `NewGame` calls `PlusInitNewGame` after `ResetWRAM` |
+| `engine/menus/save.asm` | 610, 628 | wild | both `TryLoadSaveFile` paths rebuild the maps |
+| `maps/ElmsLab.asm` | 8, 1649 | wild | `ELMSLAB_PLUS_AIDE` object id and object event |
+| `maps/ElmsLab.asm` | 165-187, 199-221, 231-253 | wild | the three poke ball scripts show and give the mapped starter |
+| `maps/ElmsLab.asm` | 267, 592, 1121 | wild | `PlusOfferStarterScript`, `PlusWildAideScript`, aide text |
+| `maps/GoldenrodGameCorner.asm` | 183-195, 205-217, 227-239 | wild | three prize scripts name and give the mapped species |
+| `maps/CeladonGameCornerPrizeRoom.asm` | 147-159, 169-181, 191-203 | wild | the same for the Kanto prizes |
 
 ## Design notes
 
@@ -93,22 +102,37 @@ attacker-controlled. Vanilla Unown slots are
 never remapped, so the Ruins of Alph stay intact. The Pokédex AREA screen
 applies the inverse map in shuffle modes and falls back to vanilla in chaos.
 
-**Trainer randomizer.** `TRAINERTYPE_NORMAL` trainers only (397 of 541);
-gym leaders, the rival, Elite Four and anyone with custom moves or items are
-untouched. Each mon is replaced per battle by a random basic-stage species
-from a level-banded list, then evolved along its own line using a level
-discount: evolution thresholds are scaled by 4/3 below level 30 and 8/7 at
-30 and above. Item and trade evolutions apply at 35+, happiness at 20
-(babies) or 35, Tyrogue and Eevee pick a branch at random.
+The permutation is rebuilt from the seed rather than saved, which makes
+determinism a hard requirement: `PlusBuildWildMaps` never calls `Random`, only
+a 16-bit xorshift seeded from `wPlusSeed`. `wPlusWildInverseMap` doubles as the
+Fisher-Yates scratch buffer while the forward map is being built, and is filled
+in for real afterwards.
 
-**Catch-up EXP.** After the Lucky Egg check, each recipient whose level is
-below the fainted enemy's gets ×1.5 per started 3-level gap
-(1.5^(1+⌊gap/3⌋)), clamped at 65535.
+Every hook reaches the randomizer through `farcall`, which can carry neither an
+argument nor a result in `a`: the macro loads `a` with a bank number going in,
+and `ReturnFarCall` leaves `a` holding `c` coming back. `PlusMapWildSpecies`
+therefore takes the species in `b` and returns it in `b`. The one place the
+vanilla value of `a` still matters is `ChooseWildEncounter`, where the level in
+`a` is what the vanilla validation bug actually checks; the hook pushes and pops
+it around the call so that bug behaves exactly as it always did.
 
-**Rematches.** `AlreadyBeatenTrainerScript` offers a rematch to every map
-trainer; each gym script gets a rematch branch that skips the badge and TM.
+`ClearWRAM` only clears WRAM bank 1 (a vanilla bug), so bank 2 holds garbage at
+boot. Nothing reads it: `wPlusFlags` lives in bank 1 and is therefore zero until
+either a new game or a save load, and both rebuild the maps before the flag can
+be set.
 
-**60 fps.** `MaxOverworldDelay` drops from 2 to 1 and `StepVectors` switches
-to a table with halved deltas and doubled durations; the slow step keeps
-its 1 px / 2 frame cadence by moving only on even steps. Whether the
-overworld needs double-speed CPU to fit a frame is measured, not assumed.
+`givepoke` only takes a literal species, so the starter and Game Corner prize
+scripts call `PlusGiveScriptMon` instead, with the level and held item written
+through `loadmem`. The species handed over comes from `wPlusMappedSpecies`
+rather than `wScriptVar`, so the yes/no prompt and the dex check in between are
+free to use `wScriptVar` and chaos mode cannot re-roll between naming a mon and
+giving it. The Game Corner *menu* labels are static text and still read ABRA,
+CUBONE and so on; the vendor's confirmation and hand-over lines name the mon
+that is actually given.
+
+The starters use their own selection over `PlusTierStarter` alone, seeded from
+`wPlusSeed`, so the three balls hold three distinct starter-legal mon and the
+offer does not move while the player looks at all three. The rival still reads
+`EVENT_GOT_*_FROM_ELM`, which the ball scripts set unchanged, so his choice
+follows the ball taken rather than the species.
+

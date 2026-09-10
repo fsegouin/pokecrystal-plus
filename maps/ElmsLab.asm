@@ -5,6 +5,7 @@
 	const ELMSLAB_POKE_BALL2
 	const ELMSLAB_POKE_BALL3
 	const ELMSLAB_OFFICER
+	const ELMSLAB_PLUS_AIDE ; plus:
 
 ElmsLab_MapScripts:
 	def_scene_scripts
@@ -161,25 +162,29 @@ CyndaquilPokeBallScript:
 	iftrue LookAtElmPokeBallScript
 	turnobject ELMSLAB_ELM, DOWN
 	reanchormap
-	pokepic CYNDAQUIL
-	cry CYNDAQUIL
+	setval CYNDAQUIL ; plus: this ball does not always hold CYNDAQUIL
+	special PlusMapStarterMon ; plus:
+	pokepic 0 ; plus:
+	cry 0 ; plus:
 	waitbutton
 	closepokepic
 	opentext
-	writetext TakeCyndaquilText
-	yesorno
+	scall PlusOfferStarterScript ; plus: replaces the writetext and yesorno
 	iffalse DidntChooseStarterScript
 	disappear ELMSLAB_POKE_BALL1
 	setevent EVENT_GOT_CYNDAQUIL_FROM_ELM
 	writetext ChoseStarterText
 	promptbutton
 	waitsfx
-	getmonname STRING_BUFFER_3, CYNDAQUIL
+	special PlusRecallMappedMon ; plus:
+	getmonname STRING_BUFFER_3, 0 ; plus:
 	writetext ReceivedStarterText
 	playsound SFX_CAUGHT_MON
 	waitsfx
 	promptbutton
-	givepoke CYNDAQUIL, 5, BERRY
+	loadmem wCurPartyLevel, 5 ; plus: the level PlusGiveScriptMon hands out
+	loadmem wCurItem, BERRY ; plus:
+	special PlusGiveScriptMon ; plus: givepoke cannot take a variable species
 	closetext
 	readvar VAR_FACING
 	ifequal RIGHT, ElmDirectionsScript
@@ -191,25 +196,29 @@ TotodilePokeBallScript:
 	iftrue LookAtElmPokeBallScript
 	turnobject ELMSLAB_ELM, DOWN
 	reanchormap
-	pokepic TOTODILE
-	cry TOTODILE
+	setval TOTODILE ; plus: this ball does not always hold TOTODILE
+	special PlusMapStarterMon ; plus:
+	pokepic 0 ; plus:
+	cry 0 ; plus:
 	waitbutton
 	closepokepic
 	opentext
-	writetext TakeTotodileText
-	yesorno
+	scall PlusOfferStarterScript ; plus: replaces the writetext and yesorno
 	iffalse DidntChooseStarterScript
 	disappear ELMSLAB_POKE_BALL2
 	setevent EVENT_GOT_TOTODILE_FROM_ELM
 	writetext ChoseStarterText
 	promptbutton
 	waitsfx
-	getmonname STRING_BUFFER_3, TOTODILE
+	special PlusRecallMappedMon ; plus:
+	getmonname STRING_BUFFER_3, 0 ; plus:
 	writetext ReceivedStarterText
 	playsound SFX_CAUGHT_MON
 	waitsfx
 	promptbutton
-	givepoke TOTODILE, 5, BERRY
+	loadmem wCurPartyLevel, 5 ; plus: the level PlusGiveScriptMon hands out
+	loadmem wCurItem, BERRY ; plus:
+	special PlusGiveScriptMon ; plus: givepoke cannot take a variable species
 	closetext
 	applymovement PLAYER, AfterTotodileMovement
 	sjump ElmDirectionsScript
@@ -219,25 +228,29 @@ ChikoritaPokeBallScript:
 	iftrue LookAtElmPokeBallScript
 	turnobject ELMSLAB_ELM, DOWN
 	reanchormap
-	pokepic CHIKORITA
-	cry CHIKORITA
+	setval CHIKORITA ; plus: this ball does not always hold CHIKORITA
+	special PlusMapStarterMon ; plus:
+	pokepic 0 ; plus:
+	cry 0 ; plus:
 	waitbutton
 	closepokepic
 	opentext
-	writetext TakeChikoritaText
-	yesorno
+	scall PlusOfferStarterScript ; plus: replaces the writetext and yesorno
 	iffalse DidntChooseStarterScript
 	disappear ELMSLAB_POKE_BALL3
 	setevent EVENT_GOT_CHIKORITA_FROM_ELM
 	writetext ChoseStarterText
 	promptbutton
 	waitsfx
-	getmonname STRING_BUFFER_3, CHIKORITA
+	special PlusRecallMappedMon ; plus:
+	getmonname STRING_BUFFER_3, 0 ; plus:
 	writetext ReceivedStarterText
 	playsound SFX_CAUGHT_MON
 	waitsfx
 	promptbutton
-	givepoke CHIKORITA, 5, BERRY
+	loadmem wCurPartyLevel, 5 ; plus: the level PlusGiveScriptMon hands out
+	loadmem wCurItem, BERRY ; plus:
+	special PlusGiveScriptMon ; plus: givepoke cannot take a variable species
 	closetext
 	applymovement PLAYER, AfterChikoritaMovement
 	sjump ElmDirectionsScript
@@ -246,6 +259,36 @@ DidntChooseStarterScript:
 	writetext DidntChooseStarterText
 	waitbutton
 	closetext
+	end
+
+; plus: Elm names the species and its type when he offers you a ball, which
+; only fits a ball that still holds what it held in vanilla. Once the wild
+; randomizer is on, the offer names whatever is actually in there instead.
+PlusOfferStarterScript: ; plus:
+	special PlusCheckWildOn
+	ifnotequal 0, .Shuffled
+	special PlusRecallMappedMon
+	ifequal TOTODILE, .Totodile
+	ifequal CHIKORITA, .Chikorita
+	writetext TakeCyndaquilText
+	yesorno
+	end
+
+.Totodile:
+	writetext TakeTotodileText
+	yesorno
+	end
+
+.Chikorita:
+	writetext TakeChikoritaText
+	yesorno
+	end
+
+.Shuffled:
+	special PlusRecallMappedMon
+	getmonname STRING_BUFFER_3, 0
+	writetext PlusTakeStarterText
+	yesorno
 	end
 
 ElmDirectionsScript:
@@ -544,6 +587,128 @@ AideScript_AfterTheft:
 	waitbutton
 	closetext
 	end
+
+; plus: the wild randomizer switch, see docs/plus.md
+PlusWildAideScript: ; plus:
+	faceplayer
+	opentext
+	special PlusCheckWildOn
+	ifnotequal 0, .AlreadyOn
+	writetext PlusAideOfferText
+	yesorno
+	iffalse .Declined
+	sjump .PickMode
+
+.AlreadyOn:
+	writetext PlusAideAlreadyOnText
+	loadmenu .RunningMenuHeader
+	verticalmenu
+	closewindow
+	ifequal 1, .PickMode
+	ifequal 2, .NewPatternOnly
+	ifequal 3, .TurnOff
+	sjump .Declined
+
+.PickMode:
+	writetext PlusAideModeText
+	loadmenu .ModeMenuHeader
+	verticalmenu
+	closewindow
+	ifequal 1, .Tiered
+	ifequal 2, .Untiered
+	ifequal 3, .Chaos
+	sjump .Declined
+
+.Tiered:
+	scall .AskPatternThenConfirm
+	iffalse .Declined
+	setval PLUS_WILD_MODE_TIERED
+	sjump .Apply
+
+.Untiered:
+	scall .AskPatternThenConfirm
+	iffalse .Declined
+	setval PLUS_WILD_MODE_UNTIERED
+	sjump .Apply
+
+.Chaos:
+	scall .AskPatternThenConfirm
+	iffalse .Declined
+	setval PLUS_WILD_MODE_CHAOS
+	sjump .Apply
+
+.Apply:
+	special PlusSetWildMode
+	writetext PlusAideDoneText
+	waitbutton
+	closetext
+	end
+
+.NewPatternOnly:
+	writetext PlusAideConfirmText
+	yesorno
+	iffalse .Declined
+	special PlusGenerateSeed
+	writetext PlusAideDoneText
+	waitbutton
+	closetext
+	end
+
+.TurnOff:
+	writetext PlusAideConfirmText
+	yesorno
+	iffalse .Declined
+	setval PLUS_WILD_SET_OFF
+	special PlusSetWildMode
+	writetext PlusAideOffText
+	waitbutton
+	closetext
+	end
+
+.Declined:
+	writetext PlusAideDeclinedText
+	waitbutton
+	closetext
+	end
+
+.AskPatternThenConfirm:
+	writetext PlusAideNewPatternText
+	yesorno
+	iffalse .KeepPattern
+	special PlusGenerateSeed
+
+.KeepPattern:
+	writetext PlusAideConfirmText
+	yesorno
+	end
+
+.RunningMenuHeader:
+	db MENU_BACKUP_TILES ; flags
+	menu_coords 0, 2, 14, TEXTBOX_Y - 1
+	dw .RunningMenuData
+	db 1 ; default option
+
+.RunningMenuData:
+	db STATICMENU_CURSOR ; flags
+	db 4 ; items
+	db "CHANGE MODE@"
+	db "NEW PATTERN@"
+	db "TURN OFF@"
+	db "CANCEL@"
+
+.ModeMenuHeader:
+	db MENU_BACKUP_TILES ; flags
+	menu_coords 0, 2, 14, TEXTBOX_Y - 1
+	dw .ModeMenuData
+	db 1 ; default option
+
+.ModeMenuData:
+	db STATICMENU_CURSOR ; flags
+	db 4 ; items
+	db "BY TIER@"
+	db "ANY #MON@"
+	db "CHAOS@"
+	db "CANCEL@"
 
 MeetCopScript2:
 	applymovement PLAYER, MeetCopScript2_StepLeft
@@ -950,6 +1115,77 @@ ElmPokeBallText:
 	text "It contains a"
 	line "#MON caught by"
 	cont "PROF.ELM."
+	done
+
+; plus: wild randomizer text
+PlusTakeStarterText: ; plus:
+	text "ELM: You'll take"
+	line "@"
+	text_ram wStringBuffer3
+	text ", then?"
+	done
+
+PlusAideOfferText: ; plus:
+	text "I'm testing a new"
+	line "field program."
+
+	para "It moves the wild"
+	line "#MON around."
+
+	para "Want me to switch"
+	line "it on?"
+	done
+
+PlusAideAlreadyOnText: ; plus:
+	text "The shuffle is"
+	line "running."
+	done
+
+PlusAideModeText: ; plus:
+	text "BY TIER: swaps"
+	line "keep a #MON's"
+	cont "strength."
+
+	para "ANY #MON: swaps"
+	line "go anywhere."
+
+	para "CHAOS: rerolls"
+	line "every encounter."
+	done
+
+PlusAideNewPatternText: ; plus:
+	text "Roll a brand-new"
+	line "pattern?"
+
+	para "The one you have"
+	line "now will be lost."
+	done
+
+PlusAideConfirmText: ; plus:
+	text "Shall I go ahead?"
+	done
+
+PlusAideDoneText: ; plus:
+	text "All set!"
+
+	para "The wild #MON"
+	line "are shuffled now."
+
+	para "Have fun out"
+	line "there!"
+	done
+
+PlusAideOffText: ; plus:
+	text "Program off."
+
+	para "The wild #MON"
+	line "are back to"
+	cont "normal."
+	done
+
+PlusAideDeclinedText: ; plus:
+	text "No problem. I'll"
+	line "be right here."
 	done
 
 ElmsLabHealingMachineText1:
@@ -1410,3 +1646,4 @@ ElmsLab_MapEvents:
 	object_event  7,  3, SPRITE_POKE_BALL, SPRITEMOVEDATA_STILL, 0, 0, -1, -1, 0, OBJECTTYPE_SCRIPT, 0, TotodilePokeBallScript, EVENT_TOTODILE_POKEBALL_IN_ELMS_LAB
 	object_event  8,  3, SPRITE_POKE_BALL, SPRITEMOVEDATA_STILL, 0, 0, -1, -1, 0, OBJECTTYPE_SCRIPT, 0, ChikoritaPokeBallScript, EVENT_CHIKORITA_POKEBALL_IN_ELMS_LAB
 	object_event  5,  3, SPRITE_OFFICER, SPRITEMOVEDATA_STANDING_UP, 0, 0, -1, -1, PAL_NPC_BLUE, OBJECTTYPE_SCRIPT, 0, CopScript, EVENT_COP_IN_ELMS_LAB
+	object_event  1,  4, SPRITE_SCIENTIST, SPRITEMOVEDATA_STANDING_RIGHT, 0, 0, -1, -1, PAL_NPC_BLUE, OBJECTTYPE_SCRIPT, 0, PlusWildAideScript, -1 ; plus:

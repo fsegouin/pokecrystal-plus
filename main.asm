@@ -687,6 +687,9 @@ SECTION "Plus", ROMX
 
 ; Pokémon Crystal+ - see docs/plus.md
 INCLUDE "data/plus/wild_tiers.asm"
+INCLUDE "data/plus/wild_chaos_bans.asm"
+INCLUDE "engine/plus/wild.asm"
+INCLUDE "engine/plus/prize_menu.asm"
 
 
 SECTION "Stadium 2 Checksums", ROMX[$7DE0], BANK[$7F]
