@@ -632,7 +632,11 @@ PlusWildAideScript: ; plus:
 	sjump .Apply
 
 .Chaos:
-	scall .AskPatternThenConfirm
+; plus: chaos rolls afresh at every encounter and never builds a permutation,
+; so wPlusSeed has nothing to feed. Skip the pattern question the other two
+; modes ask and go straight to the confirmation.
+	writetext PlusAideConfirmText
+	yesorno
 	iffalse .Declined
 	setval PLUS_WILD_MODE_CHAOS
 	sjump .Apply
@@ -645,11 +649,24 @@ PlusWildAideScript: ; plus:
 	end
 
 .NewPatternOnly:
+; plus: the menu offers this whatever the mode, but under chaos there is no
+; permutation for a reroll to rebuild, so say so instead. Note the seed also
+; feeds PlusComputeStarterSlots, so a reroll would still move the three
+; starters until one is taken. PlusCheckWildOn returns the mode plus one, and
+; the verticalmenu above has already overwritten wScriptVar.
+	special PlusCheckWildOn
+	ifequal PLUS_WILD_MODE_CHAOS + 1, .ChaosHasNoPattern
 	writetext PlusAideConfirmText
 	yesorno
 	iffalse .Declined
 	special PlusGenerateSeed
 	writetext PlusAideDoneText
+	waitbutton
+	closetext
+	end
+
+.ChaosHasNoPattern:
+	writetext PlusAideChaosNoPatternText
 	waitbutton
 	closetext
 	end
@@ -1094,6 +1111,25 @@ ElmDirectionsText2:
 ElmDirectionsText3:
 	text "<PLAY_G>, I'm"
 	line "counting on you!"
+
+; plus: point the player at the wild randomizer, which is otherwise an NPC
+; they have no reason to talk to. Said here because this is the one moment
+; every player is standing in the lab with nothing else to do. Deliberately
+; vague: the aide's own lines explain the program, so saying it twice would
+; only make the opening longer. "New" tells him apart from the aide who has
+; always been in the lab and is about to hand over a POTION.
+	para "Oh, and talk to"
+	line "my new aide"
+	cont "before you go."
+
+	para "He's cooked up"
+	line "something you"
+	cont "might find quite"
+	cont "interesting."
+
+	para "Especially if"
+	line "this isn't your"
+	cont "first journey."
 	done
 
 GotElmsNumberText:
@@ -1173,6 +1209,15 @@ PlusAideDoneText: ; plus:
 
 	para "Have fun out"
 	line "there!"
+	done
+
+PlusAideChaosNoPatternText: ; plus:
+	text "CHAOS has no"
+	line "pattern to roll."
+
+	para "It picks fresh"
+	line "every time you"
+	cont "meet a #MON."
 	done
 
 PlusAideOffText: ; plus:
@@ -1458,9 +1503,9 @@ AideText_GiveYouPotion:
 	done
 
 AideText_AlwaysBusy:
-	text "There are only two"
-	line "of us, so we're"
-	cont "always busy."
+	text "There are only"
+	line "three of us, so"
+	cont "we're always busy."
 	done
 
 AideText_TheftTestimony:

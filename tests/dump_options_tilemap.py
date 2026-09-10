@@ -1,7 +1,9 @@
 """Dump the options screen's background tilemap to a file.
 
-Used to prove the first page of the options menu is unchanged: run it against
-a build without the SELECT sub-page, then against one with it, and diff.
+Run it against two builds and diff, to see exactly what moved on the first page.
+
+The first page is no longer identical to a build without the SELECT sub-page:
+row 1, which vanilla leaves empty, now carries the SELECT hint.
 """
 import os
 import sys

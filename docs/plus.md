@@ -86,9 +86,12 @@ Every place vanilla code is modified. Keep this current.
 | `engine/events/treemons.asm` | 187-191 | wild | `SelectTreeMon` maps the species before storing it |
 | `engine/menus/intro_menu.asm` | 65 | wild | `NewGame` calls `PlusInitNewGame` after `ResetWRAM` |
 | `engine/menus/save.asm` | 610, 628 | wild | both `TryLoadSaveFile` paths rebuild the maps |
-| `maps/ElmsLab.asm` | 8, 1649 | wild | `ELMSLAB_PLUS_AIDE` object id and object event |
+| `maps/ElmsLab.asm` | 8, 1693 | wild | `ELMSLAB_PLUS_AIDE` object id and object event |
 | `maps/ElmsLab.asm` | 165-187, 199-221, 231-253 | wild | the three poke ball scripts show and give the mapped starter |
-| `maps/ElmsLab.asm` | 267, 592, 1121 | wild | `PlusOfferStarterScript`, `PlusWildAideScript`, aide text |
+| `maps/ElmsLab.asm` | 267, 592, 1156 | wild | `PlusOfferStarterScript`, `PlusWildAideScript`, aide text |
+| `maps/ElmsLab.asm` | `ElmDirectionsText3` | wild | Elm points the player at the new aide, the one moment everyone is stood in the lab |
+| `maps/ElmsLab.asm` | `PlusWildAideScript.Chaos`, `.NewPatternOnly`, `.ChaosHasNoPattern` | wild | chaos skips the pattern question, and says so if the menu asks for a reroll |
+| `maps/ElmsLab.asm` | `AideText_AlwaysBusy` | wild | "only two of us" becomes three, since the lab has a third occupant now |
 | `maps/GoldenrodGameCorner.asm` | 183-195, 205-217, 227-239 | wild | three prize scripts name and give the mapped species |
 | `maps/CeladonGameCornerPrizeRoom.asm` | 147-159, 169-181, 191-203 | wild | the same for the Kanto prizes |
 | `main.asm` | `"Plus"` section | trainers | includes `data/plus/trainer_basics.asm` and `engine/plus/trainer.asm` |
@@ -135,6 +138,7 @@ Every place vanilla code is modified. Keep this current.
 | `engine/overworld/scripting.asm` | `Script_deactivatefacing` | 60 fps | the turn-in-place delay doubles |
 | `engine/events/map_name_sign.asm` | `InitMapNameSign`, `PlaceMapNameSign` | 60 fps | `MapNameSignFrames60` sets and re-reads the sign's countdown |
 | `engine/menus/options_menu.asm` | `_Option` and below | 60 fps | SELECT sub-page: `Options_DrawPage`, `Options_FrameRate`, page-aware `GetOptionPointer` and `OptionsControl` |
+| `engine/menus/options_menu.asm` | `Options_DrawPage`, after each `PlaceString` | 60 fps | `StringOptionsHintMore` and `StringOptionsHintBack` on the row the options leave empty |
 | `home/double_speed.asm` | after `SwitchSpeed` | 60 fps | `PlusUpdateOverworldSpeed`, `PlusNormalSpeed`, `PlusSwitchSpeed` |
 | `engine/overworld/events.asm` | `HandleMap`, `EnterMap` | 60 fps | match the CPU speed to the option |
 | `engine/battle/core.asm` | `StartBattle` | 60 fps | normal speed for the battle, double again after `ExitBattle` |

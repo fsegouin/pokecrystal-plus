@@ -86,6 +86,9 @@ Options_DrawPage:
 	jr nz, .plus_page
 	ld de, StringOptions
 	call PlaceString
+	hlcoord 7, 1 ; plus
+	ld de, StringOptionsHintMore ; plus
+	call PlaceString ; plus
 	xor a
 	ld [wJumptableIndex], a
 ; display the settings of each option when the menu is opened
@@ -96,6 +99,9 @@ Options_DrawPage:
 
 .plus_page
 	ld de, StringPlusOptions
+	call PlaceString
+	hlcoord 7, 1
+	ld de, StringOptionsHintBack
 	call PlaceString
 	xor a
 	ld [wJumptableIndex], a
@@ -145,6 +151,15 @@ StringPlusOptions:
 	db "FRAME RATE<LF>"
 	db "        :<LF>"
 	db "CANCEL@"
+
+; plus: nothing else on the screen says the second page is there, so each page
+; names the key and what it does. Twelve characters ending at the right edge of
+; the textbox, on the row the options themselves leave empty.
+StringOptionsHintMore:
+	db "SELECT: MORE@"
+
+StringOptionsHintBack:
+	db "SELECT: BACK@"
 
 GetOptionPointer:
 	ld a, [wPlusOptionsPage] ; plus
