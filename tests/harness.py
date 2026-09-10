@@ -117,6 +117,36 @@ class Crystal:
     def read_block(self, name, length):
         return bytes(self.read(name, i) for i in range(length))
 
+    def farcall(self, name, frames=2):
+        """Run one ROM routine on its own, the way `farcall` in the game does.
+
+        Sets up a: hl for the rst $08 vector, points the return address at two
+        bytes of `jr -2` parked in HRAM, then lets the CPU run until it spins
+        there. Interrupts are masked for the duration so no handler can touch
+        the routine's inputs, and WRAM bank 1 is paged in so WRAMX symbols
+        resolve the way they do in the overworld. Boot first: this needs the
+        stack and the ROM bank register in a sane state."""
+        bank, addr = self.syms[name]
+        pb, rf = self.pb, self.pb.register_file
+        trap = self.syms["hMathBuffer"][1]
+        pb.memory[trap] = 0x18      # jr -2
+        pb.memory[trap + 1] = 0xFE
+        saved_ie = pb.memory[0xFFFF]
+        pb.memory[0xFFFF] = 0       # mask every interrupt
+        pb.memory[0xFF70] = 1       # SVBK: WRAM bank 1
+        sp = rf.SP - 2
+        pb.memory[sp] = trap & 0xFF
+        pb.memory[sp + 1] = trap >> 8
+        rf.SP = sp
+        rf.A = bank
+        rf.HL = addr
+        rf.PC = 0x0008              # rst FarCall
+        self.run(frames)
+        pb.memory[0xFFFF] = saved_ie
+        if rf.PC != trap:
+            raise RuntimeError(
+                f"{name} did not return within {frames} frames (PC=${rf.PC:04x})")
+
     def load_state(self, name):
         p = name if os.path.exists(name) else os.path.join(STATES, name + ".state")
         with open(p, "rb") as f:

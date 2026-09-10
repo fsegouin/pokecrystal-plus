@@ -7111,6 +7111,9 @@ GiveExperiencePoints:
 	ld a, [hl]
 	cp LUCKY_EGG
 	call z, BoostExp
+; plus: catch-up EXP booster. Like the Lucky Egg check above it finds the
+; recipient through wCurPartyMon, so bc is left alone for the pop below.
+	farcall PlusCatchUpExpBoost
 	ldh a, [hQuotient + 3]
 	ld [wStringBuffer2 + 1], a
 	ldh a, [hQuotient + 2]

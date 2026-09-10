@@ -7,6 +7,7 @@ and distributed as a BPS patch against the vanilla ROM.
 |---|---|---|
 | Wild encounter randomizer (tiered / untiered shuffle, or chaos) | Scientist, Elm's Lab | done |
 | Trainer roster randomizer | Scientist, Cherrygrove Pokémon Center | done |
+| Catch-up EXP booster | Scientist, Celadon Café | done |
 
 Scripted encounters (gifts, in-game trades, statics, roamers, Bug Contest)
 are never randomized. The starter is the one deliberate exception.
@@ -88,6 +89,9 @@ Every place vanilla code is modified. Keep this current.
 | `main.asm` | `"Plus"` section | trainers | includes `data/plus/trainer_basics.asm` and `engine/plus/trainer.asm` |
 | `engine/battle/read_trainer_party.asm` | `TrainerType1` loop | trainers | `farcall PlusRandomizeTrainerMon` between the species write and `predef TryAddMonToParty`, bracketed by `push hl` / `pop hl` |
 | `maps/CherrygrovePokecenter1F.asm` | object list, scripts, texts, object events | trainers | Scientist at (7, 3) and its yes/no toggle script |
+| `main.asm` | 690, `"Plus"` section | catch-up EXP | `INCLUDE "engine/plus/exp.asm"` |
+| `engine/battle/core.asm` | 7116, `GiveExperiencePoints` | catch-up EXP | `farcall PlusCatchUpExpBoost` after the Lucky Egg boost |
+| `maps/CeladonCafe.asm` | 7, 90, 218, 297 | catch-up EXP | object const, toggle script, five texts, object at (9, 1) |
 
 ## Design notes
 
@@ -170,4 +174,8 @@ so a rematch fields a different team. The species is swapped before
 `TryAddMonToParty` runs, which builds the level-up moveset for whatever
 species it is handed, so a randomized mon always has moves it could really
 have learned at that level.
+
+**Catch-up EXP.** After the Lucky Egg check, each recipient whose level is
+below the fainted enemy's gets ×1.5 per started 3-level gap
+(1.5^(1+⌊gap/3⌋)), clamped at 65535.
 

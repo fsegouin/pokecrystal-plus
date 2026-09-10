@@ -4,6 +4,7 @@
 	const CELADONCAFE_FISHER2
 	const CELADONCAFE_FISHER3
 	const CELADONCAFE_TEACHER
+	const CELADONCAFE_SCIENTIST ; plus: catch-up EXP booster toggle
 
 CeladonCafe_MapScripts:
 	def_scene_scripts
@@ -83,6 +84,37 @@ CeladonCafeTeacher:
 	waitbutton
 	closetext
 	turnobject CELADONCAFE_TEACHER, LEFT
+	end
+
+; plus: catch-up EXP booster toggle
+CeladonCafeScientist:
+	faceplayer
+	opentext
+	callasm PlusCheckExpBoost
+	iftrue .TurnItOff
+	writetext ScientistText_OfferBoost
+	yesorno
+	iffalse .NeverMind
+	callasm PlusToggleExpBoost
+	writetext ScientistText_BoostOn
+	waitbutton
+	closetext
+	end
+
+.TurnItOff:
+	writetext ScientistText_OfferToStop
+	yesorno
+	iffalse .NeverMind
+	callasm PlusToggleExpBoost
+	writetext ScientistText_BoostOff
+	waitbutton
+	closetext
+	end
+
+.NeverMind:
+	writetext ScientistText_NeverMind
+	waitbutton
+	closetext
 	end
 
 EatathonContestPoster:
@@ -182,6 +214,44 @@ TeacherText_MoreChef:
 	text "More, CHEF!"
 	done
 
+; plus: catch-up EXP booster toggle
+ScientistText_OfferBoost:
+	text "Your #MON keep"
+	line "fainting?"
+
+	para "I can teach them"
+	line "to learn faster"
+	cont "from foes above"
+	cont "their level."
+
+	para "Want me to?"
+	done
+
+ScientistText_BoostOn:
+	text "There! They'll"
+	line "catch up fast"
+	cont "now."
+	done
+
+ScientistText_OfferToStop:
+	text "The catch-up"
+	line "boost is on."
+
+	para "Shall I turn it"
+	line "off?"
+	done
+
+ScientistText_BoostOff:
+	text "It's off. Train"
+	line "the old way!"
+	done
+
+ScientistText_NeverMind:
+	text "Fine. Come back"
+	line "if you change"
+	cont "your mind."
+	done
+
 EatathonContestPosterText:
 	text "Eatathon Contest!"
 	line "No time limit!"
@@ -224,3 +294,4 @@ CeladonCafe_MapEvents:
 	object_event  1,  7, SPRITE_FISHER, SPRITEMOVEDATA_STANDING_RIGHT, 0, 0, -1, -1, PAL_NPC_GREEN, OBJECTTYPE_SCRIPT, 0, CeladonCafeFisher2, -1
 	object_event  1,  2, SPRITE_FISHER, SPRITEMOVEDATA_STANDING_RIGHT, 0, 0, -1, -1, 0, OBJECTTYPE_SCRIPT, 0, CeladonCafeFisher3, -1
 	object_event  4,  3, SPRITE_TEACHER, SPRITEMOVEDATA_STANDING_LEFT, 0, 0, -1, -1, 0, OBJECTTYPE_SCRIPT, 0, CeladonCafeTeacher, -1
+	object_event  9,  1, SPRITE_SCIENTIST, SPRITEMOVEDATA_STANDING_DOWN, 0, 0, -1, -1, PAL_NPC_BLUE, OBJECTTYPE_SCRIPT, 0, CeladonCafeScientist, -1 ; plus: catch-up EXP booster toggle
