@@ -56,6 +56,7 @@ SetFacingStepAction:
 ; iterations per tile, so it only advances on half of them and the legs move at
 ; the speed they do at 30 fps.
 	lb de, %00001111, 1 ; plus
+	call DoubleStepFrameWhenRunning ; plus
 	call AdvanceStepFrame60
 
 	rrca
@@ -332,4 +333,22 @@ AdvanceStepFrame60:
 .hold
 	ld a, [hl]
 	and d
+	ret
+
+; plus: a running step covers a tile in half the iterations a walking one does,
+; so its animation counter has to advance twice as fast for the legs to keep
+; pace with the feet. Takes the counter step in e and returns it doubled while
+; the object is part way through a running step. Preserves bc, d and hl.
+DoubleStepFrameWhenRunning:
+	push hl
+	ld hl, OBJECT_WALKING
+	add hl, bc
+	ld a, [hl]
+	pop hl
+	cp STANDING
+	ret z
+	and %00001100
+	cp STEP_RUN << 2
+	ret nz
+	sla e
 	ret

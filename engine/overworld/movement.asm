@@ -91,6 +91,11 @@ MovementPointers:
 	dw Movement_rock_smash            ; 57
 	dw Movement_return_dig            ; 58
 	dw Movement_skyfall_top           ; 59
+; plus: the running shoes step (see docs/plus.md)
+	dw Movement_run_step_down         ; 5a
+	dw Movement_run_step_up           ; 5b
+	dw Movement_run_step_left         ; 5c
+	dw Movement_run_step_right        ; 5d
 	assert_table_length NUM_MOVEMENT_CMDS
 
 Movement_teleport_from:
@@ -471,6 +476,25 @@ Movement_big_step_left:
 
 Movement_big_step_right:
 	ld a, STEP_BIKE << 2 | RIGHT
+	jp NormalStep
+
+; plus: the running shoes step (see docs/plus.md). It moves at the bike's
+; speed but gets a StepVectors row of its own, so that the walk animation can
+; tell a run apart from a big step and speed the legs up to match.
+Movement_run_step_down:
+	ld a, STEP_RUN << 2 | DOWN
+	jp NormalStep
+
+Movement_run_step_up:
+	ld a, STEP_RUN << 2 | UP
+	jp NormalStep
+
+Movement_run_step_left:
+	ld a, STEP_RUN << 2 | LEFT
+	jp NormalStep
+
+Movement_run_step_right:
+	ld a, STEP_RUN << 2 | RIGHT
 	jp NormalStep
 
 Movement_turn_away_down:

@@ -486,6 +486,15 @@ StepVectors:
 	db  0, -4,  4, 4
 	db -4,  0,  4, 4
 	db  4,  0,  4, 4
+; plus: the running shoes row (see docs/plus.md). It repeats the fast row, so
+; a run and a big step cover a tile in the same time; the row exists so the two
+; can still be told apart, and so that the top step type is a defined entry
+; rather than a read off the end of the table.
+	; running
+	db  0,  4,  4, 4
+	db  0, -4,  4, 4
+	db -4,  0,  4, 4
+	db  4,  0,  4, 4
 
 ; plus: the same movement at 60 fps. Every delta is halved and every duration
 ; doubled, so duration x delta still comes to one tile and duration x speed
@@ -505,6 +514,11 @@ StepVectors60:
 	db -1,  0, 16, 1
 	db  1,  0, 16, 1
 	; fast
+	db  0,  2,  8, 2
+	db  0, -2,  8, 2
+	db -2,  0,  8, 2
+	db  2,  0,  8, 2
+	; running
 	db  0,  2,  8, 2
 	db  0, -2,  8, 2
 	db -2,  0,  8, 2

@@ -298,7 +298,19 @@ DoPlayerMovement::
 	ret
 
 .walk
+; plus: the running shoes (see docs/plus.md). Holding B while walking on foot
+; steps at the bike's speed instead. Nothing gates it: it is on from the start.
+	ld a, [wCurInput]
+	bit B_PAD_B, a
+	jr nz, .run
 	ld a, STEP_WALK
+	call .DoStep
+	scf
+	ret
+
+; plus: the running shoes
+.run
+	ld a, STEP_RUN
 	call .DoStep
 	scf
 	ret
@@ -466,6 +478,7 @@ DoPlayerMovement::
 	dw .SlowStep
 	dw .NormalStep
 	dw .FastStep
+	dw .RunStep ; plus
 	dw .JumpStep
 	dw .SlideStep
 	dw .TurningStep
@@ -488,6 +501,12 @@ DoPlayerMovement::
 	big_step UP
 	big_step LEFT
 	big_step RIGHT
+; plus: the running shoes step
+.RunStep:
+	run_step DOWN
+	run_step UP
+	run_step LEFT
+	run_step RIGHT
 .JumpStep:
 	jump_step DOWN
 	jump_step UP

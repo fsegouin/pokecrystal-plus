@@ -219,4 +219,15 @@ MACRO skyfall_top
 	db movement_skyfall_top
 ENDM
 
+; plus: the running shoes step (see docs/plus.md). The four directions sit at
+; the end of the table rather than on a multiple of four, so the macro adds the
+; direction instead of masking it in; DOWN, UP, LEFT and RIGHT are 0 to 3.
+	const movement_run_step_down  ; $5a
+	const movement_run_step_up    ; $5b
+	const movement_run_step_left  ; $5c
+	const movement_run_step_right ; $5d
+MACRO run_step
+	db movement_run_step_down + \1
+ENDM
+
 DEF NUM_MOVEMENT_CMDS EQU const_value
