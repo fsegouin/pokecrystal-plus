@@ -48,17 +48,17 @@ g('I', "###..", ".#...", ".#...", ".#...", ".#...", ".#...", "###..")
 g('J', "..##.", "...#.", "...#.", "...#.", "...#.", "#..#.", ".##..")
 g('K', "#..#.", "#.#..", "##...", "##...", "#.#..", "#.#..", "#..#.")
 g('L', "#....", "#....", "#....", "#....", "#....", "#....", "####.")
-g('M', "#...#", "##.##", "#.#.#", "#.#.#", "#...#", "#...#", "#...#")
+g('M', "#..#.", "####.", "####.", "#..#.", "#..#.", "#..#.", "#..#.")
 g('N', "#..#.", "##.#.", "##.#.", "#.##.", "#.##.", "#..#.", "#..#.")
 g('O', ".##..", "#..#.", "#..#.", "#..#.", "#..#.", "#..#.", ".##..")
 g('P', "###..", "#..#.", "#..#.", "###..", "#....", "#....", "#....")
 g('Q', ".##..", "#..#.", "#..#.", "#..#.", "#.##.", "#..#.", ".###.")
 g('R', "###..", "#..#.", "#..#.", "###..", "#.#..", "#..#.", "#..#.")
 g('S', ".###.", "#....", "#....", ".##..", "...#.", "...#.", "###..")
-g('T', "#####", "..#..", "..#..", "..#..", "..#..", "..#..", "..#..")
+g('T', "####.", ".#...", ".#...", ".#...", ".#...", ".#...", ".#...")
 g('U', "#..#.", "#..#.", "#..#.", "#..#.", "#..#.", "#..#.", ".##..")
 g('V', "#..#.", "#..#.", "#..#.", "#..#.", "#..#.", ".##..", ".##..")
-g('W', "#...#", "#...#", "#...#", "#.#.#", "#.#.#", "##.##", "#...#")
+g('W', "#..#.", "#..#.", "#..#.", "#..#.", "####.", "####.", "#..#.")
 g('X', "#..#.", "#..#.", ".##..", ".##..", ".##..", "#..#.", "#..#.")
 g('Y', "#..#.", "#..#.", "#..#.", ".##..", "..#..", "..#..", "..#..")
 g('Z', "####.", "...#.", "..#..", ".#...", "#....", "#....", "####.")
@@ -78,7 +78,7 @@ g('i', ".#...", ".....", "##...", ".#...", ".#...", ".#...", "###..")
 g('j', "...#.", ".....", "..##.", "...#.", "...#.", "#..#.", ".##..")
 g('k', "#....", "#....", "#..#.", "#.#..", "##...", "#.#..", "#..#.")
 g('l', "##...", ".#...", ".#...", ".#...", ".#...", ".#...", "###..")
-g('m', ".....", ".....", "##.#.", "#.#.#", "#.#.#", "#.#.#", "#...#")
+g('m', ".....", ".....", "###..", "#.#..", "#.#..", "#.#..", "#.#..")
 g('n', ".....", ".....", "###..", "#..#.", "#..#.", "#..#.", "#..#.")
 g('o', ".....", ".....", ".##..", "#..#.", "#..#.", "#..#.", ".##..")
 g('p', ".....", "###..", "#..#.", "#..#.", "###..", "#....", "#....")
@@ -88,7 +88,7 @@ g('s', ".....", ".....", ".###.", "#....", ".##..", "...#.", "###..")
 g('t', ".#...", ".#...", "###..", ".#...", ".#...", ".#...", "..##.")
 g('u', ".....", ".....", "#..#.", "#..#.", "#..#.", "#..#.", ".###.")
 g('v', ".....", ".....", "#..#.", "#..#.", "#..#.", ".##..", ".##..")
-g('w', ".....", ".....", "#...#", "#.#.#", "#.#.#", "#.#.#", ".#.#.")
+g('w', ".....", ".....", "#.#..", "#.#..", "#.#..", "#.#..", "###..")
 g('x', ".....", ".....", "#..#.", ".##..", ".##..", ".##..", "#..#.")
 g('y', ".....", "#..#.", "#..#.", "#..#.", ".###.", "...#.", ".##..")
 g('z', ".....", ".....", "####.", "..#..", ".#...", "#....", "####.")
@@ -115,7 +115,7 @@ g("'", ".#...", ".#...", ".....", ".....", ".....", ".....", ".....")
 g('!', ".#...", ".#...", ".#...", ".#...", ".#...", ".....", ".#...")
 g('?', ".##..", "#..#.", "...#.", "..#..", ".#...", ".....", ".#...")
 g('/', "...#.", "...#.", "..#..", "..#..", ".#...", ".#...", "#....")
-g('%', "#...#", "...#.", "..#..", "..#..", ".#...", "#...#", ".....")
+g('%', "#..#.", "...#.", "..#..", ".#...", "#....", "#..#.", ".....")
 
 # Narrow glyphs first, then the wide ones. The renderer keys off the index:
 # anything from WIDE_FIRST on advances eight pixels instead of five.
@@ -125,12 +125,19 @@ NARROW = (
     + [chr(c) for c in range(ord('0'), ord('9') + 1)]
     + [' ', ':', '.', ',', '-', "'", '!', '?', '/', '%']
 )
-# male, female, ":L", the ten digits, then the nine letters the status
-# strings need. All but the gender symbols are lifted from the originals.
-STATUS_LETTERS = "SLPNBRFZA"
-WIDE = (['\x01', '\x02', '\x03']
-        + [f'\\d{d}' for d in range(10)]
-        + [f'\\u{c}' for c in STATUS_LETTERS])
+# male, female, ":L", then the ten digits. All but the gender symbols are
+# lifted from the originals.
+WIDE = ['\x01', '\x02', '\x03'] + [f'\\d{d}' for d in range(10)]
+
+# A status shows as a tag rather than three letters: white on a black rounded
+# bar, the way later generations badge them. Nothing in the palette changes.
+# Every battle background palette runs white to black, so a tile with its
+# background filled and the letters knocked out of it comes out white on black
+# for free. Each tag is three cells, the same width a level takes, so the row
+# is laid out identically either way.
+STATUSES = ("SLP", "PSN", "BRN", "FRZ", "PAR")
+TAG_W = 3 * 8
+WIDE += [f'\\t{name}{i}' for name in STATUSES for i in range(3)]
 WIDE_FIRST = len(NARROW)
 ORDER = NARROW + WIDE
 for _ch in WIDE:
@@ -156,6 +163,42 @@ FEMALE_ART = ["..###...",
               ".#####..",
               "...#....",
               "...#...."]
+
+# Four by five, so three of them and a gap fit inside a tag with a margin.
+TAG_LETTERS = {
+    'S': (".###", "#...", ".##.", "...#", "###."),
+    'L': ("#...", "#...", "#...", "#...", "####"),
+    'P': ("###.", "#..#", "###.", "#...", "#..."),
+    'N': ("#..#", "##.#", "#.##", "#..#", "#..#"),
+    'B': ("###.", "#..#", "###.", "#..#", "###."),
+    'R': ("###.", "#..#", "###.", "#.#.", "#..#"),
+    'F': ("####", "#...", "###.", "#...", "#..."),
+    'Z': ("####", "...#", ".##.", "#...", "####"),
+    'A': (".##.", "#..#", "####", "#..#", "#..#"),
+}
+
+
+def tag_bitmap(name):
+    """A rounded black bar with the three letters knocked out of it."""
+    on = [[False] * TAG_W for _ in range(H)]
+    for y in range(H):
+        for x in range(TAG_W):
+            # clip the four corners to round the ends
+            corner = min(x, TAG_W - 1 - x) + min(y, H - 1 - y)
+            on[y][x] = corner >= 1
+    width = 3 * 4 + 2 * 1                  # three letters and two gaps
+    ox = (TAG_W - width) // 2
+    # Five rows of letter in an eight row bar cannot sit dead centre. One row
+    # of bar above and two below reads better than the other way round.
+    oy = 1
+    for i, ch in enumerate(name):
+        art = TAG_LETTERS[ch]
+        for y, row in enumerate(art):
+            for x, cell in enumerate(row):
+                if cell == "#":
+                    on[y + oy][ox + i * 5 + x] = False
+    return on
+
 
 MALE, FEMALE = 0xEF, 0xF5
 
@@ -189,12 +232,18 @@ def copy_originals(px, cols):
     draw('\x01', MALE_ART)
     draw('\x02', FEMALE_ART)
 
+    for name in STATUSES:
+        bits = tag_bitmap(name)
+        for third in range(3):
+            ox, oy = cell(f'\\t{name}{third}')
+            for y in range(H):
+                for x in range(8):
+                    px[ox + x, oy + y] = 0 if bits[y][third * 8 + x] else 255
+
     font = Image.open(os.path.join(root, "gfx", "font", "font.png")).convert("L")
     fpx = font.load()
     for d in range(10):
         blit(f'\\d{d}', fpx, (0xF6 + d) - 0x80, 16)
-    for c in STATUS_LETTERS:
-        blit(f'\\u{c}', fpx, (0x80 + ord(c) - ord('A')) - 0x80, 16)
 
     # ":L" is not in the standard font; it is the third tile of the enemy HP
     # bar border, loaded at BG tile $6e.

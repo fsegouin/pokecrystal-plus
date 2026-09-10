@@ -51,6 +51,12 @@ DEF PLUS_HUD_TILES        EQU 11 ; tiles the row is given
 ; that needs it: a ten character name with a gender symbol and a three digit
 ; level runs two pixels past the bar rather than overlapping itself.
 DEF PLUS_HUD_ALIGN_TILES  EQU 10
+; The name's home, in pixels from the start of the row: directly above the "P"
+; of the "HP" label on the bar below. The label sits a tile in from the row and
+; its "P" seven pixels into that, so fifteen. A row that does not fit from here
+; is set against the right instead.
+DEF PLUS_HUD_LEFT         EQU 15
+
 DEF PLUS_HUD_ENEMY_TILE   EQU $c6 ; $c6-$cf
 DEF PLUS_HUD_ENEMY_RUN    EQU 10
 DEF PLUS_HUD_ENEMY_TILE2  EQU $e4 ; $e4, the eleventh
@@ -60,3 +66,18 @@ DEF PLUS_HUD_PLAYER_TILE2 EQU $ba ; $ba-$bc, the last three
 
 DEF PLUS_HUD_GLYPH_W   EQU 5  ; the condensed name's advance, in pixels
 DEF PLUS_HUD_WIDE_FIRST EQU 72 ; glyphs from here on are the originals, 8 wide
+
+; plus: written over sPlusChainCheck so a cartridge whose SRAM has never held
+; a chain reads as no chain rather than as whatever was in those bytes.
+DEF PLUS_CHAIN_MAGIC EQU $c5
+
+; plus: the chain pays out in DV rolls, on the same allowance the script gift
+; uses. Each row is the shortest chain that earns that many rolls, highest
+; first, so the lookup is a walk down the table until one fits. N rolls come to
+; about N in 8192, so this runs 1/2048, 1/1024, 1/512, 1/256.
+DEF PLUS_CHAIN_TIERS EQU 4
+
+; plus: how many times a mon handed over by a script rolls its DVs. Shininess
+; in this generation is nothing but the DVs, so an extra chance is literally an
+; extra roll, and N rolls come to about N in 8192. Sixteen is one in 512.
+DEF PLUS_SHINY_ROLLS_SCRIPT EQU 16

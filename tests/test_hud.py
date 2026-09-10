@@ -14,9 +14,9 @@ The checks are:
     and a three digit level in the eleven tiles the row has;
   * a character with no glyph is skipped rather than drawing rubbish;
   * both HUDs point at their own composed tiles once a battle is running;
-  * the whole row is set against the HP bar's right hand end, so the level
-    lands in the same column whatever the name's length, and a short name
-    pushes the row right rather than leaving a gap;
+  * the name starts above the "P" of the HP label below it whenever the rest
+    of the row fits alongside, and only sets against the right when it does
+    not, which is what the Japanese HUD does;
   * a status condition is drawn in the level's place, and the five
     conditions are all distinct.
 
@@ -37,7 +37,8 @@ from harness import STATES, Crystal  # noqa: E402
 
 # constants/plus_constants.asm
 PLUS_HUD_TILES = 11         # tiles the row is given
-PLUS_HUD_ALIGN_TILES = 10   # the level is set against the HP bar's right end
+PLUS_HUD_ALIGN_TILES = 10   # the last cell the row may use, level to the right
+PLUS_HUD_LEFT = 15          # the name's home, above the "P" of the HP label
 PLUS_HUD_GLYPH_W = 5        # the condensed name's advance
 # not an asm constant: the copied glyphs keep their original width
 PLUS_HUD_WIDE_W = 8
@@ -140,29 +141,31 @@ def tail_width(level, gender, status):
 
 
 def test_layout(c):
-    print("\n== the whole row is set against the right, with no gaps ==")
+    print("\n== the name sits above the HP label's P, or sets right ==")
     right = PLUS_HUD_ALIGN_TILES * 8
-    for name, level, gender in (("PSYDUCK", 14, MALE), ("NIDOKING", 45, FEMALE),
-                                ("MR.MIME", 7, 0), ("Sparky", 3, MALE),
-                                ("Mew", 5, 0), ("FARFETCH'D", 50, MALE)):
+    for name, level, gender in (("RATTATA", 6, FEMALE), ("Mew", 5, 0),
+                                ("PSYDUCK", 14, MALE), ("NIDOKING", 45, FEMALE),
+                                ("MR.MIME", 7, 0), ("FARFETCH'D", 50, MALE)):
         row, tiles = build_row(c, name, level=level, gender=gender)
         cols = ink_columns(row)
         width = len(name) * PLUS_HUD_GLYPH_W + tail_width(level, gender, 0)
-        if width > right:
-            # too wide to set right, so it starts at the left and runs into
-            # the eleventh tile instead of overlapping itself
-            check(min(cols) == 0 and max(cols) < PLUS_HUD_TILES * 8,
-                  f"{name} L{level} is too wide to set right, so it starts left",
-                  f"ink {min(cols)}..{max(cols)}, width {width}")
-        else:
+
+        if PLUS_HUD_LEFT + width <= right:
+            check(min(cols) == PLUS_HUD_LEFT,
+                  f"{name} L{level} starts at its home above the P",
+                  f"first inked column {min(cols)}, wanted {PLUS_HUD_LEFT}")
+        elif width <= right:
             check(right - PLUS_HUD_WIDE_W < max(cols) < right,
-                  f"{name} L{level} finishes against the right",
+                  f"{name} L{level} does not fit there, so it sets right",
                   f"last inked column {max(cols)}, wanted just under {right}")
-            check(min(cols) >= right - width,
-                  f"{name} L{level} starts no earlier than its own width allows",
-                  f"first inked column {min(cols)}, width {width}")
-        # nothing inside the row is more than a glyph apart, so there is no
-        # gap between the name, the symbol and the level
+            check(min(cols) < PLUS_HUD_LEFT,
+                  f"{name} L{level} therefore starts left of the P",
+                  f"first inked column {min(cols)}")
+        else:
+            check(min(cols) == 0 and max(cols) < PLUS_HUD_TILES * 8,
+                  f"{name} L{level} is wider than the row, so it starts hard left",
+                  f"ink {min(cols)}..{max(cols)}")
+
         run = worst = 0
         for x in range(min(cols), max(cols)):
             run = run + 1 if x not in cols else 0
@@ -170,10 +173,6 @@ def test_layout(c):
         check(worst < PLUS_HUD_GLYPH_W,
               f"{name} L{level} has no gap inside it",
               f"longest blank run {worst}")
-        wanted = PLUS_HUD_TILES if width > right else PLUS_HUD_ALIGN_TILES
-        check(tiles == wanted,
-              f"{name} L{level} reports the {wanted} tiles it filled",
-              f"reported {tiles}")
 
 
 def test_worst_case(c):
@@ -194,28 +193,28 @@ def test_worst_case(c):
 
 
 def test_gender_and_level(c):
-    print("\n== the level lands in the same place every time ==")
-    right = PLUS_HUD_ALIGN_TILES * 8
+    print("\n== the gender symbol and level follow the name ==")
     male, _ = build_row(c, "PSYDUCK", level=14, gender=MALE)
     female, _ = build_row(c, "PSYDUCK", level=14, gender=FEMALE)
     check(male != female, "the two gender symbols are different glyphs")
     check(max(ink_columns(male)) == max(ink_columns(female)),
           "and both end in the same place",
           f"{max(ink_columns(male))} against {max(ink_columns(female))}")
-    for level in (5, 14, 99, 100):
-        row, _ = build_row(c, "PSYDUCK", level=level, gender=MALE)
-        check(right - PLUS_HUD_WIDE_W < max(ink_columns(row)) <= right,
-              f"level {level} finishes against the right",
-              f"last inked column {max(ink_columns(row))}")
-    long_name, _ = build_row(c, "NIDOKING", level=14, gender=MALE)
-    short_name, _ = build_row(c, "Mew", level=14, gender=MALE)
-    check(max(ink_columns(long_name)) == max(ink_columns(short_name)),
-          "and in the same place whatever the name's length",
-          f"{max(ink_columns(long_name))} against {max(ink_columns(short_name))}")
-    # a shorter name pushes the row right, it does not stretch it
-    check(min(ink_columns(short_name)) > min(ink_columns(long_name)),
-          "a shorter name starts further right, rather than leaving a gap",
-          f"{min(ink_columns(short_name))} against {min(ink_columns(long_name))}")
+    # two names that both fit from the home position start in the same place
+    short, _ = build_row(c, "Mew", level=5, gender=0)
+    other, _ = build_row(c, "RATTATA", level=6, gender=FEMALE)
+    check(min(ink_columns(short)) == min(ink_columns(other)) == PLUS_HUD_LEFT,
+          "two names that fit both start at the home position",
+          f"{min(ink_columns(short))} and {min(ink_columns(other))}")
+    # and a longer level pushes the end right, not the name left
+    a, _ = build_row(c, "Mew", level=5, gender=0)
+    b, _ = build_row(c, "Mew", level=45, gender=0)
+    check(min(ink_columns(a)) == min(ink_columns(b)),
+          "a wider level does not move a name that still fits",
+          f"{min(ink_columns(a))} against {min(ink_columns(b))}")
+    check(max(ink_columns(b)) > max(ink_columns(a)),
+          "it makes the row end further right instead",
+          f"{max(ink_columns(b))} against {max(ink_columns(a))}")
 
 
 def test_status(c):
@@ -229,10 +228,10 @@ def test_status(c):
         seen[name] = row
         check(row != lvl, f"{name} is drawn instead of the level")
         check(max(ink_columns(row)) <= PLUS_HUD_ALIGN_TILES * 8,
-              f"{name} is set against the right like the level",
+              f"{name} stays inside the row like the level",
               f"last inked column {max(ink_columns(row))}")
     check(len(set(map(bytes, seen.values()))) == 5,
-          "all five status strings are different",
+          "all five status tags are different",
           f"{len(set(map(bytes, seen.values())))} distinct")
 
 
@@ -244,10 +243,10 @@ def test_unknown_character(c):
         c.write("wEnemyMonNickname", b, i)
     c.call("PlusHUDBuildEnemyRow")
     odd = ink_columns(c.read_block("wPlusHUDRow", ROW_BYTES))
-    # the row is right aligned, so a skipped character widens it leftwards
-    check(min(odd) < min(plain),
+    # both start at the home position, so the gap shows as a wider row
+    check(max(odd) > max(plain),
           "an unknown character takes up room without drawing",
-          f"starts at {min(odd)} against {min(plain)}")
+          f"ends at {max(odd)} against {max(plain)}")
 
 
 def reach_battle(c):

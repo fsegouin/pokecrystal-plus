@@ -30,16 +30,13 @@ DEF PLUS_HUD_GLYPH_MALE   EQU PLUS_HUD_WIDE_FIRST + 0
 DEF PLUS_HUD_GLYPH_FEMALE EQU PLUS_HUD_WIDE_FIRST + 1
 DEF PLUS_HUD_GLYPH_LV     EQU PLUS_HUD_WIDE_FIRST + 2
 DEF PLUS_HUD_GLYPH_DIGIT  EQU PLUS_HUD_WIDE_FIRST + 3
-; the nine letters the status strings are spelled from, in this order
-DEF PLUS_HUD_GLYPH_S EQU PLUS_HUD_WIDE_FIRST + 13
-DEF PLUS_HUD_GLYPH_L EQU PLUS_HUD_GLYPH_S + 1
-DEF PLUS_HUD_GLYPH_P EQU PLUS_HUD_GLYPH_S + 2
-DEF PLUS_HUD_GLYPH_N EQU PLUS_HUD_GLYPH_S + 3
-DEF PLUS_HUD_GLYPH_B EQU PLUS_HUD_GLYPH_S + 4
-DEF PLUS_HUD_GLYPH_R EQU PLUS_HUD_GLYPH_S + 5
-DEF PLUS_HUD_GLYPH_F EQU PLUS_HUD_GLYPH_S + 6
-DEF PLUS_HUD_GLYPH_Z EQU PLUS_HUD_GLYPH_S + 7
-DEF PLUS_HUD_GLYPH_A EQU PLUS_HUD_GLYPH_S + 8
+; each status tag is three cells of art, in the order SLP PSN BRN FRZ PAR
+DEF PLUS_HUD_GLYPH_TAG    EQU PLUS_HUD_WIDE_FIRST + 13
+DEF PLUS_HUD_TAG_SLP EQU PLUS_HUD_GLYPH_TAG + 0 * 3
+DEF PLUS_HUD_TAG_PSN EQU PLUS_HUD_GLYPH_TAG + 1 * 3
+DEF PLUS_HUD_TAG_BRN EQU PLUS_HUD_GLYPH_TAG + 2 * 3
+DEF PLUS_HUD_TAG_FRZ EQU PLUS_HUD_GLYPH_TAG + 3 * 3
+DEF PLUS_HUD_TAG_PAR EQU PLUS_HUD_GLYPH_TAG + 4 * 3
 
 PlusHUDComposeEnemyRow::
 ; b = gender character, c = status byte. Returns the tiles filled in b.
@@ -217,10 +214,21 @@ PlusHUDBuildRow:
 	call PlusHUDTailWidth
 	add d
 	ld d, a
+	; The name has a home: directly above the "P" of the "HP" label on the bar
+	; below. It stays there whenever the rest of the row fits alongside it, so
+	; the name starts in the same place from one mon to the next and the level
+	; falls where it falls. Only a row too wide for that is set against the
+	; right instead, which is what the Japanese one does too.
+	ld a, PLUS_HUD_LEFT
+	add d
+	cp PLUS_HUD_ALIGN_TILES * TILE_WIDTH + 1
+	ld a, PLUS_HUD_LEFT
+	jr c, .fits
+
 	ld a, PLUS_HUD_ALIGN_TILES * TILE_WIDTH
 	sub d
 	jr nc, .fits
-	xor a ; too wide to set right, so start at the left and let it run on
+	xor a ; wider than the row, so start at the left and run on
 .fits
 	ld [wPlusHUDX], a
 	pop hl
@@ -306,8 +314,8 @@ PlusHUDTailWidth:
 .got_gender
 	ld e, a
 
-	; a status condition is always three cells, and so is any level of ten or
-	; more, whether that is ":L" and two digits or three digits on their own
+	; a status tag is three cells, and so is any level of ten or more, whether
+	; that is ":L" and two digits or three digits on their own
 	ld a, [wPlusHUDStatus]
 	and a
 	ld a, 3 * TILE_WIDTH
@@ -322,25 +330,40 @@ PlusHUDTailWidth:
 	add e
 	ret
 
-PlusHUDDrawStatus:
-; c = a non-zero status byte. Draws its three letters where the level goes.
-; Tested in the same order as PlaceNonFaintStatus, which is what decides which
-; one shows when a mon somehow has more than one.
-	ld hl, .Poisoned
+PlusHUDStatusIndex:
+; c = a non-zero status byte. Returns which of the five is showing, in the same
+; order PlaceNonFaintStatus tests them, which is what decides the winner when a
+; mon somehow has more than one.
+	ld a, 1
 	bit PSN, c
-	jr nz, .draw
-	ld hl, .Burned
+	ret nz
+	ld a, 2
 	bit BRN, c
-	jr nz, .draw
-	ld hl, .Frozen
+	ret nz
+	ld a, 3
 	bit FRZ, c
-	jr nz, .draw
-	ld hl, .Paralysed
+	ret nz
+	ld a, 4
 	bit PAR, c
-	jr nz, .draw
-	ld hl, .Asleep
+	ret nz
+	xor a ; asleep
+	ret
 
-.draw
+PlusHUDDrawStatus:
+; c = a non-zero status byte. Draws its three tile tag where the level goes.
+;
+; A status draws as a tag rather than as letters: white on a black rounded bar,
+; three cells wide, which is what a level takes too. Nothing in the palette
+; changes to get white on black. Every battle background palette runs white to
+; black, so art with its background filled and its letters knocked out of it
+; comes out the right way round on its own.
+	call PlusHUDStatusIndex
+	ld l, a
+	ld h, 0
+	add hl, hl
+	add hl, hl ; three glyphs a tag, rounded up to four for the shift
+	ld de, .Tags
+	add hl, de
 	ld c, 3
 .loop
 	ld a, [hli]
@@ -353,11 +376,14 @@ PlusHUDDrawStatus:
 	jr nz, .loop
 	ret
 
-.Asleep:    db PLUS_HUD_GLYPH_S, PLUS_HUD_GLYPH_L, PLUS_HUD_GLYPH_P
-.Poisoned:  db PLUS_HUD_GLYPH_P, PLUS_HUD_GLYPH_S, PLUS_HUD_GLYPH_N
-.Burned:    db PLUS_HUD_GLYPH_B, PLUS_HUD_GLYPH_R, PLUS_HUD_GLYPH_N
-.Frozen:    db PLUS_HUD_GLYPH_F, PLUS_HUD_GLYPH_R, PLUS_HUD_GLYPH_Z
-.Paralysed: db PLUS_HUD_GLYPH_P, PLUS_HUD_GLYPH_A, PLUS_HUD_GLYPH_R
+.Tags:
+; four bytes a row so the index can be shifted rather than multiplied; the
+; fourth is never read
+	db PLUS_HUD_TAG_SLP + 0, PLUS_HUD_TAG_SLP + 1, PLUS_HUD_TAG_SLP + 2, 0
+	db PLUS_HUD_TAG_PSN + 0, PLUS_HUD_TAG_PSN + 1, PLUS_HUD_TAG_PSN + 2, 0
+	db PLUS_HUD_TAG_BRN + 0, PLUS_HUD_TAG_BRN + 1, PLUS_HUD_TAG_BRN + 2, 0
+	db PLUS_HUD_TAG_FRZ + 0, PLUS_HUD_TAG_FRZ + 1, PLUS_HUD_TAG_FRZ + 2, 0
+	db PLUS_HUD_TAG_PAR + 0, PLUS_HUD_TAG_PAR + 1, PLUS_HUD_TAG_PAR + 2, 0
 
 PlusHUDDrawLevel:
 ; ":L" and the level, in the game's own glyphs. A level of 100 fills all three

@@ -162,8 +162,25 @@ def test_dialogue(tag, sixty):
         else:
             check(min(bursts) >= 4, f"{name}: letters still arrive one at a time",
                   f"changes per box {bursts}")
-            check(frames == GOLDEN[sixty][name],
-                  f"{name}: unchanged frame for frame", f"{frames}")
+            # Boxes 2 and 3 are fixed text, so their frame counts are a real
+            # baseline. Boxes 1 and 4 name the mon on offer, which moves
+            # whenever the species pool changes, so those are checked for the
+            # ordering a text speed has to produce rather than exact frames.
+            fixed = [frames[1], frames[2]]
+            want = [GOLDEN[sixty][name][1], GOLDEN[sixty][name][2]]
+            check(fixed == want,
+                  f"{name}: the fixed boxes are unchanged frame for frame",
+                  f"{fixed} against {want}")
+            totals.setdefault("_boxes", {})[name] = frames
+
+    # the named boxes still have to get slower as the speed setting does
+    boxes = totals.get("_boxes", {})
+    if {"FAST", "MED", "SLOW"} <= boxes.keys():
+        for i in (0, 3):
+            f, m, sl = boxes["FAST"][i], boxes["MED"][i], boxes["SLOW"][i]
+            check(f < m < sl,
+                  f"box {i + 1} names a mon, and still slows with the setting",
+                  f"FAST {f}, MED {m}, SLOW {sl}")
 
     fast, inst = totals["FAST"], totals["INST"]
     check(inst * 2 <= fast, "INST is materially faster than FAST",
