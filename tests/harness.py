@@ -147,6 +147,43 @@ class Crystal:
             raise RuntimeError(
                 f"{name} did not return within {frames} frames (PC=${rf.PC:04x})")
 
+    def call(self, name, frames=4, **regs):
+        """Run a ROM routine with the registers set explicitly.
+
+        farcall() goes through the rst FarCall vector, which owns a and hl, so
+        it cannot pass arguments in them. This pages the routine's bank in
+        itself and sets whatever registers are named, which is what Predef and
+        anything taking an argument in a need. Register names are the ones
+        PyBoy exposes: a, f, b, c, d, e, hl, sp, pc. There is no h, l, bc or
+        de, so pass a pair as hl."""
+        bank, addr = self.syms[name]
+        pb, rf = self.pb, self.pb.register_file
+        trap = self.syms["hMathBuffer"][1]
+        pb.memory[trap] = 0x18      # jr -2
+        pb.memory[trap + 1] = 0xFE
+        saved_ie = pb.memory[0xFFFF]
+        pb.memory[0xFFFF] = 0       # mask every interrupt
+        pb.memory[0xFF70] = 1       # SVBK: WRAM bank 1
+        saved_bank = self.read("hROMBank")
+        if bank:
+            pb.memory[0x2000] = bank
+        sp = rf.SP - 2
+        pb.memory[sp] = trap & 0xFF
+        pb.memory[sp + 1] = trap >> 8
+        rf.SP = sp
+        for name_, value in regs.items():
+            setattr(rf, name_.upper(), value)
+        rf.PC = addr
+        self.run(frames)
+        pb.memory[0xFFFF] = saved_ie
+        # farcall gets this back from ReturnFarCall; paging the bank in by hand
+        # means putting it back by hand, or the game runs on the wrong one.
+        if bank:
+            pb.memory[0x2000] = saved_bank
+        if rf.PC != trap:
+            raise RuntimeError(
+                f"{name} did not return within {frames} frames (PC=${rf.PC:04x})")
+
     def load_state(self, name):
         p = name if os.path.exists(name) else os.path.join(STATES, name + ".state")
         with open(p, "rb") as f:

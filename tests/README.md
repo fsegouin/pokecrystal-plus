@@ -12,8 +12,14 @@ PyBoy-driven checks for Pokémon Crystal+ features. Not part of `make`.
     .venv/bin/python tests/test_fps.py          # 60 fps overworld option
     .venv/bin/python tests/test_running.py      # running shoes (hold B)
     .venv/bin/python tests/test_text.py         # INST text speed, start menu timing
+    .venv/bin/python tests/test_hud.py          # one-line battle HUD
     .venv/bin/python tests/measure_overworld.py # overworld loop timings
     .venv/bin/python tests/compare_builds.py other.gbc
+
+`battle_now.py` drops you straight into a battle in a window, to look at the
+HUD: `.venv/bin/python tests/battle_now.py`. It writes a party mon of its own,
+because the saves ship with an empty party and a trainer battle that cannot
+start leaves the approach script waiting on a movement forever.
 
 `tests/playtest.py` is a windowed play helper rather than a check; see below.
 
@@ -42,6 +48,11 @@ the exact build they came from.
 
 Keys: arrows, A = a, B = s, Start = Enter, Select = Backspace, Space = turbo.
 `tests/states/` is gitignored.
+
+`Crystal.call(symbol, **regs)` runs one ROM routine with the registers set
+explicitly, which is what a routine taking an argument in `a` needs.
+`Crystal.farcall(symbol)` goes through the game's own `rst FarCall` vector, so
+it owns `a` and `hl` and cannot pass either.
 
 `Crystal.farcall(symbol)` runs one ROM routine on its own from a cold boot, so
 a feature whose inputs and outputs are all memory can be checked without
@@ -76,6 +87,7 @@ clone has to make them once with `playtest.py`:
 
 * `fps30.sav` and `fps60.sav`, the east-west stretch in Goldenrod with the
   60 fps option off and on, used by `test_running.py` and `test_text.py`;
+  `test_hud.py` and `battle_now.py` need `fps60.sav` alone;
 * `gamecorner.sav`, in front of the Goldenrod prize vendor, used by
   `test_text.py`.
 

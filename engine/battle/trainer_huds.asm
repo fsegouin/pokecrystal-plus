@@ -146,7 +146,10 @@ DrawEnemyHUDBorder:
 	dec a
 	call CheckCaughtMon
 	ret z
-	hlcoord 1, 1
+	; plus: the name has come down into row 1, which is where this used to sit,
+	; so it moves up into row 0. That row is empty now that the name and level
+	; share one.
+	hlcoord 1, 0
 	ld [hl], $5d
 	ret
 

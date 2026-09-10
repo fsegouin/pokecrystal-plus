@@ -40,3 +40,23 @@ DEF PLUS_EVO_ITEM_LEVEL EQU 30 ; item, trade, and every other happiness line
 ; 30 rather than 35: after the 8/7 discount only 11 of the 869 mons on normal
 ; trainers reach an effective 35, so item and trade evolutions were all but
 ; unreachable. At 30 it is 106 of them.
+
+; plus: blank slots in the standard font block, used to hold the battle HUD
+; name rows. The charmap maps these ids to hiragana, which an English build
+; never places, and gfx/font/font.1bpp has nothing in them. Neither HUD has
+; eleven free slots in a row, so each takes a long run and a short one.
+DEF PLUS_HUD_TILES        EQU 11 ; tiles the row is given
+; The level is set against the right hand end of the HP bar below it, which is
+; a tile short of the row. The eleventh tile is still there for the one case
+; that needs it: a ten character name with a gender symbol and a three digit
+; level runs two pixels past the bar rather than overlapping itself.
+DEF PLUS_HUD_ALIGN_TILES  EQU 10
+DEF PLUS_HUD_ENEMY_TILE   EQU $c6 ; $c6-$cf
+DEF PLUS_HUD_ENEMY_RUN    EQU 10
+DEF PLUS_HUD_ENEMY_TILE2  EQU $e4 ; $e4, the eleventh
+DEF PLUS_HUD_PLAYER_TILE  EQU $d7 ; $d7-$de
+DEF PLUS_HUD_PLAYER_RUN   EQU 8
+DEF PLUS_HUD_PLAYER_TILE2 EQU $ba ; $ba-$bc, the last three
+
+DEF PLUS_HUD_GLYPH_W   EQU 5  ; the condensed name's advance, in pixels
+DEF PLUS_HUD_WIDE_FIRST EQU 72 ; glyphs from here on are the originals, 8 wide

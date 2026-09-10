@@ -3792,6 +3792,29 @@ wPlusStarterSlots:: ds 3
 ; over is the one whose name and picture were shown
 wPlusMappedSpecies:: db
 
+; plus: the battle HUD name row, composed at run time in the narrow font.
+; Request1bpp blocks until the transfer is done and never touches rWBK, so
+; the bank selected around the call is still selected when VBlank reads this.
+; One tile more than the row is reserved, so a glyph straddling the last one
+; has somewhere to put its overflow.
+wPlusHUDRow:: ds (PLUS_HUD_TILES + 1) * TILE_1BPP_SIZE
+wPlusHUDRowEnd::
+
+; plus: what each HUD row looked like when its tiles were last sent to VRAM.
+; The HUD is redrawn constantly, but the row itself changes only on a switch,
+; a level up or a status change, so the tiles are only resent when one of
+; these stops matching. That matters for more than speed: the upload waits on
+; a VBlank handler that serves 1bpp requests, and battle animations run one
+; that does not, so an upload started under one of those would never finish.
+wPlusHUDLastEnemy::  ds (PLUS_HUD_TILES + 1) * TILE_1BPP_SIZE
+wPlusHUDLastPlayer:: ds (PLUS_HUD_TILES + 1) * TILE_1BPP_SIZE
+
+wPlusHUDX::      db ; pen position across the row, in pixels
+wPlusHUDShift::  db ; pen position within the current tile, 0 to 7
+wPlusHUDLevel::  db ; counted down a place at a time while the level is drawn
+wPlusHUDGender:: db ; held while the row is measured, before anything is drawn
+wPlusHUDStatus:: db
+
 
 
 SECTION "Stack RAM", WRAMX

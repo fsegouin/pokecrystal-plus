@@ -4655,13 +4655,6 @@ CheckDanger:
 	ret
 
 PrintPlayerHUD:
-	ld de, wBattleMonNickname
-	hlcoord 10, 7
-	call Battle_DummyFunction
-	call PlaceString
-
-	push bc
-
 	ld a, [wCurBattleMon]
 	ld hl, wPartyMon1DVs
 	call GetPartyLocation
@@ -4683,9 +4676,6 @@ PrintPlayerHUD:
 	ld [wCurSpecies], a
 	call GetBaseData
 
-	pop hl
-	dec hl
-
 	ld a, TEMPMON
 	ld [wMonType], a
 	callfar GetGender
@@ -4696,25 +4686,22 @@ PrintPlayerHUD:
 	ld a, '♀'
 
 .got_gender_char
-	hlcoord 17, 8
-	ld [hl], a
-	hlcoord 14, 8
-	push af ; back up gender
-	push hl
-	ld de, wBattleMonStatus
-	predef PlaceNonFaintStatus
-	pop hl
-	pop bc
-	ret nz
-	ld a, b
-	cp ' '
-	jr nz, .copy_level ; male or female
-	dec hl ; genderless
+; plus: as on the enemy side, the whole row is composed into its own tiles.
+	ld b, a
+	ld a, [wBattleMonStatus]
+	ld c, a
+	farcall PlusHUDComposePlayerRow ; b = tiles the row filled
 
-.copy_level
-	ld a, [wBattleMonLevel]
-	ld [wTempMonLevel], a
-	jp PrintLevel
+	hlcoord 9, 8
+	ld de, PlusHUDPlayerTiles
+	ld c, b
+.plus_row
+	ld a, [de]
+	inc de
+	ld [hli], a
+	dec c
+	jr nz, .plus_row
+	ret
 
 UpdateEnemyHUD::
 	push hl
@@ -4726,6 +4713,25 @@ UpdateEnemyHUD::
 	pop de
 	pop hl
 	ret
+
+; plus: the tile ids each composed HUD row uses. Neither HUD has eleven blank
+; font slots in a row, so each takes a long run and a short one, and the row is
+; written from the table rather than by counting up.
+PlusHUDEnemyTiles:
+FOR n, PLUS_HUD_ENEMY_RUN
+	db PLUS_HUD_ENEMY_TILE + n
+ENDR
+FOR n, PLUS_HUD_TILES - PLUS_HUD_ENEMY_RUN
+	db PLUS_HUD_ENEMY_TILE2 + n
+ENDR
+
+PlusHUDPlayerTiles:
+FOR n, PLUS_HUD_PLAYER_RUN
+	db PLUS_HUD_PLAYER_TILE + n
+ENDR
+FOR n, PLUS_HUD_TILES - PLUS_HUD_PLAYER_RUN
+	db PLUS_HUD_PLAYER_TILE2 + n
+ENDR
 
 DrawEnemyHUD:
 	xor a
@@ -4741,14 +4747,6 @@ DrawEnemyHUD:
 	ld [wCurSpecies], a
 	ld [wCurPartySpecies], a
 	call GetBaseData
-	ld de, wEnemyMonNickname
-	hlcoord 1, 0
-	call Battle_DummyFunction
-	call PlaceString
-	ld h, b
-	ld l, c
-	dec hl
-
 	ld hl, wEnemyMonDVs
 	ld de, wTempMonDVs
 	ld a, [wEnemySubStatus5]
@@ -4772,27 +4770,24 @@ DrawEnemyHUD:
 	ld a, '♀'
 
 .got_gender
-	hlcoord 9, 1
-	ld [hl], a
+; plus: the whole row is composed into tiles of its own, so the gender symbol,
+; the level and the status each start exactly where the piece before it ended
+; instead of at the next tile boundary. Only the name is condensed; everything
+; else on the row is the game's own graphics at its own size.
+	ld b, a
+	ld a, [wEnemyMonStatus]
+	ld c, a
+	farcall PlusHUDComposeEnemyRow ; b = tiles the row filled
 
-	hlcoord 6, 1
-	push af
-	push hl
-	ld de, wEnemyMonStatus
-	predef PlaceNonFaintStatus
-	pop hl
-	pop bc
-	jr nz, .skip_level
-	ld a, b
-	cp ' '
-	jr nz, .print_level
-	dec hl
-.print_level
-	ld a, [wEnemyMonLevel]
-	ld [wTempMonLevel], a
-	call PrintLevel
-.skip_level
-
+	hlcoord 1, 1
+	ld de, PlusHUDEnemyTiles
+	ld c, b
+.plus_row
+	ld a, [de]
+	inc de
+	ld [hli], a
+	dec c
+	jr nz, .plus_row
 	ld hl, wEnemyMonHP
 	ld a, [hli]
 	ldh [hMultiplicand + 1], a
@@ -4872,8 +4867,9 @@ UpdateHPPal:
 	ret z
 	jp FinishBattleAnim
 
-Battle_DummyFunction:
-; Called before placing either battler's nickname in the HUD.
+Battle_DummyFunction: ; unreferenced
+; Was called before placing either battler's nickname in the HUD, until the
+; plus HUD stopped placing the nickname as text.
 ; This was CenterMonName in Gen 1.
 ; In Gen 2, pokemon nicknames are always left-aligned on the HUD.
 	ret
@@ -6856,6 +6852,7 @@ BoostStat:
 
 _LoadBattleFontsHPBar:
 	callfar LoadBattleFontsHPBar
+	farcall PlusHUDInvalidate ; plus: that reload blanked the composed HUD rows
 	ret
 
 _LoadHPBar:
