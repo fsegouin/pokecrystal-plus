@@ -48,6 +48,9 @@ DEF TEXT_DELAY_MASK EQU %111
 DEF TEXT_DELAY_FAST EQU %001 ; 1
 DEF TEXT_DELAY_MED  EQU %011 ; 3
 DEF TEXT_DELAY_SLOW EQU %101 ; 5
+; plus: the value is a frame count, so INST is simply zero of them. The three
+; vanilla values keep their encoding, so an old save reads back unchanged.
+DEF TEXT_DELAY_INST EQU %000 ; 0
 
 ; wTextboxFrame::
 	const_def

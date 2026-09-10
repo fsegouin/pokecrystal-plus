@@ -171,10 +171,12 @@ GetOptionPointer:
 	dw Options_FrameRate
 	dw Options_Cancel
 
+; plus: INST heads the list so LEFT still means faster and RIGHT slower
 	const_def
-	const OPT_TEXT_SPEED_FAST ; 0
-	const OPT_TEXT_SPEED_MED  ; 1
-	const OPT_TEXT_SPEED_SLOW ; 2
+	const OPT_TEXT_SPEED_INST ; 0
+	const OPT_TEXT_SPEED_FAST ; 1
+	const OPT_TEXT_SPEED_MED  ; 2
+	const OPT_TEXT_SPEED_SLOW ; 3
 
 Options_TextSpeed:
 	call GetTextSpeed
@@ -186,7 +188,7 @@ Options_TextSpeed:
 	ld a, c ; right pressed
 	cp OPT_TEXT_SPEED_SLOW
 	jr c, .Increase
-	ld c, OPT_TEXT_SPEED_FAST - 1
+	ld c, OPT_TEXT_SPEED_INST - 1 ; plus: INST is now the first entry
 
 .Increase:
 	inc c
@@ -225,10 +227,12 @@ Options_TextSpeed:
 
 .Strings:
 ; entries correspond to OPT_TEXT_SPEED_* constants
+	dw .Inst ; plus
 	dw .Fast
 	dw .Mid
 	dw .Slow
 
+.Inst: db "INST@" ; plus
 .Fast: db "FAST@"
 .Mid:  db "MID @"
 .Slow: db "SLOW@"
@@ -238,6 +242,8 @@ GetTextSpeed:
 ; with previous/next TEXT_DELAY_* values in d/e
 	ld a, [wOptions]
 	and TEXT_DELAY_MASK
+	cp TEXT_DELAY_INST ; plus
+	jr z, .inst ; plus
 	cp TEXT_DELAY_SLOW
 	jr z, .slow
 	cp TEXT_DELAY_FAST
@@ -249,12 +255,18 @@ GetTextSpeed:
 
 .slow
 	ld c, OPT_TEXT_SPEED_SLOW
-	lb de, TEXT_DELAY_MED, TEXT_DELAY_FAST
+	lb de, TEXT_DELAY_MED, TEXT_DELAY_INST ; plus: SLOW is last, so RIGHT wraps to INST
 	ret
 
 .fast
 	ld c, OPT_TEXT_SPEED_FAST
-	lb de, TEXT_DELAY_SLOW, TEXT_DELAY_MED
+	lb de, TEXT_DELAY_INST, TEXT_DELAY_MED ; plus: LEFT from FAST reaches INST
+	ret
+
+; plus: INST is first, so LEFT wraps round to SLOW
+.inst
+	ld c, OPT_TEXT_SPEED_INST
+	lb de, TEXT_DELAY_SLOW, TEXT_DELAY_FAST
 	ret
 
 Options_BattleScene:

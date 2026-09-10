@@ -5,6 +5,7 @@ PrintLetterDelay::
 ; 	fast: 1 frame
 ; 	mid:  3 frames
 ; 	slow: 5 frames
+; 	inst: 0 frames ; plus
 
 ; wTextboxFlags[!0] and A or B override text speed with a one-frame delay.
 ; wOptions[4] and wTextboxFlags[!1] disable the delay.
@@ -12,6 +13,15 @@ PrintLetterDelay::
 	ld a, [wOptions]
 	bit NO_TEXT_SCROLL, a
 	ret nz
+
+; plus: INST takes the same exit NO_TEXT_SCROLL does, rather than storing a
+; frame count of zero. Returning here also skips the one-frame delay that
+; holding A or B would otherwise add, which would slow INST down rather
+; than speed it up. Home is one byte from full, so the zero the mask leaves
+; is tested directly instead of with a cp.
+	assert TEXT_DELAY_INST == 0
+	and TEXT_DELAY_MASK
+	ret z
 
 ; non-scrolling text?
 	ld a, [wTextboxFlags]
