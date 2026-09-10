@@ -23,11 +23,13 @@ start leaves the approach script waiting on a movement forever.
 
 `tests/playtest.py` is a windowed play helper rather than a check; see below.
 
-`test_wild.py` needs no save state. It boots the ROM, mashes through the new
-game flow once, and from there calls the routines under test directly: it
-parks the CPU in a two byte loop in HRAM, sets the registers and program
+Most of `test_wild.py` needs no save state. It boots the ROM, mashes through
+the new game flow once, and from there calls the routines under test directly:
+it parks the CPU in a two byte loop in HRAM, sets the registers and program
 counter, and reads the result out of WRAM. That covers the map builder and the
-vanilla encounter routines at their hook sites without walking to a route.
+vanilla encounter routines at their hook sites without walking to a route. The
+shiny and chain checks are the exception: they load `tests/states/fps60.sav`,
+since they need a party and a start menu to look at.
 
 ## Hand-offs: battery saves and states
 
@@ -87,7 +89,8 @@ clone has to make them once with `playtest.py`:
 
 * `fps30.sav` and `fps60.sav`, the east-west stretch in Goldenrod with the
   60 fps option off and on, used by `test_running.py` and `test_text.py`;
-  `test_hud.py` and `battle_now.py` need `fps60.sav` alone;
+  `test_hud.py`, `battle_now.py` and part of `test_wild.py` need
+  `fps60.sav` alone;
 * `gamecorner.sav`, in front of the Goldenrod prize vendor, used by
   `test_text.py`.
 

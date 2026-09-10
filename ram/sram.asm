@@ -47,7 +47,16 @@ sMysteryGiftUnusedFlag:: db
 sMysteryGiftTrainer:: ds wMysteryGiftTrainerEnd - wMysteryGiftTrainer
 sBackupMysteryGiftItemEnd::
 
-	ds $30
+; plus: the shiny chain. This sits in SRAM rather than in the saved game block
+; because it is written the moment a battle ends, not when the player saves.
+; That is the whole point of it: beat a one-off encounter, reset without
+; saving, and the world rolls back while the chain does not. Nothing here is
+; covered by either save checksum, so writing it mid-session corrupts nothing.
+sPlusChainCheck::   db ; PLUS_CHAIN_MAGIC once the three bytes mean anything
+sPlusChainSpecies:: db
+sPlusChainCount::   db
+
+	ds $2d
 
 sRTCStatusFlags:: db
 	ds 7

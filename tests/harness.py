@@ -91,6 +91,17 @@ class Crystal:
     def bank(self, name):
         return self.syms[name][0]
 
+    @property
+    def trap(self):
+        """Two bytes of HRAM to park a called routine's return address in.
+
+        The nineteen bytes after hClockResetTrigger close out the section and
+        nothing in the game touches them. hMathBuffer, the obvious-looking
+        choice, is scratch that Multiply writes through, so a routine that does
+        any arithmetic overwrites the very instruction it is due to return to.
+        """
+        return self.syms["hClockResetTrigger"][1] + 8
+
     def read(self, name, offset=0):
         """Read one byte at symbol+offset. ROM, SRAM and WRAMX symbols are read
         from the bank the .sym names, not whichever bank is currently paged in."""
@@ -128,7 +139,7 @@ class Crystal:
         stack and the ROM bank register in a sane state."""
         bank, addr = self.syms[name]
         pb, rf = self.pb, self.pb.register_file
-        trap = self.syms["hMathBuffer"][1]
+        trap = self.trap
         pb.memory[trap] = 0x18      # jr -2
         pb.memory[trap + 1] = 0xFE
         saved_ie = pb.memory[0xFFFF]
@@ -158,7 +169,7 @@ class Crystal:
         de, so pass a pair as hl."""
         bank, addr = self.syms[name]
         pb, rf = self.pb, self.pb.register_file
-        trap = self.syms["hMathBuffer"][1]
+        trap = self.trap
         pb.memory[trap] = 0x18      # jr -2
         pb.memory[trap + 1] = 0xFE
         saved_ie = pb.memory[0xFFFF]
@@ -166,7 +177,13 @@ class Crystal:
         pb.memory[0xFF70] = 1       # SVBK: WRAM bank 1
         saved_bank = self.read("hROMBank")
         if bank:
+            # rst Bankswitch writes both the MBC register and hROMBank, and
+            # every routine that pages a bank in restores itself from hROMBank
+            # afterwards. Setting only the register leaves the game convinced
+            # it is somewhere else, and the first GetFarByte along the way
+            # comes back with the wrong bank's data.
             pb.memory[0x2000] = bank
+            self.write("hROMBank", bank)
         sp = rf.SP - 2
         pb.memory[sp] = trap & 0xFF
         pb.memory[sp + 1] = trap >> 8
@@ -180,6 +197,7 @@ class Crystal:
         # means putting it back by hand, or the game runs on the wrong one.
         if bank:
             pb.memory[0x2000] = saved_bank
+            self.write("hROMBank", saved_bank)
         if rf.PC != trap:
             raise RuntimeError(
                 f"{name} did not return within {frames} frames (PC=${rf.PC:04x})")

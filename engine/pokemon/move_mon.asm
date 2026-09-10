@@ -206,6 +206,9 @@ endr
 	ld b, a
 	call Random
 	ld c, a
+	push hl ; plus: farcall loads hl itself, and it is the moves pointer
+	farcall PlusBoostShinyDVs ; plus: better shiny odds on a mon a script gives
+	pop hl ; plus
 .initializeDVs
 	ld a, b
 	ld [de], a

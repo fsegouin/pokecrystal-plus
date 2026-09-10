@@ -34,6 +34,10 @@ PlusBuildWildMaps::
 .have_seed
 	ld a, BANK(wPlusWildMap)
 	ldh [rWBK], a
+	; ClearWRAM only wipes bank 1, and a reset partway through a gift would
+	; leave an allowance behind, so start the count at zero on every load.
+	xor a
+	ld [wPlusShinyRolls], a
 	call .SetIdentity
 
 	call PlusGetWildMode
@@ -473,6 +477,7 @@ PlusInitNewGame::
 ; the aide in Elm's lab has something to turn on.
 	xor a
 	call PlusWriteFlags
+	call PlusChainReset
 	; fallthrough
 
 PlusGenerateSeed::
@@ -677,10 +682,381 @@ PlusGiveScriptMon::
 ; in between is free to use wScriptVar for its own purposes.
 	call PlusRecallMappedMon
 	ld [wCurPartySpecies], a
+
+	; A mon the game hands you is one you keep, so make it worth looking at.
+	; The allowance is a plain count of DV rolls, which is what a chain would
+	; raise too if one is ever added.
+	ld a, PLUS_SHINY_ROLLS_SCRIPT
+	call PlusSetShinyRolls
+
 	ld b, 0 ; not another trainer's mon
 	farcall GivePoke
+	push bc
+	xor a
+	call PlusSetShinyRolls
+	pop bc
 	ld a, b
 	ld [wScriptVar], a
+	ret
+
+PlusSetShinyRolls:
+; a = how many times the next mon generated should roll its DVs.
+	ld b, a
+	ldh a, [rWBK]
+	push af
+	ld a, BANK(wPlusShinyRolls)
+	ldh [rWBK], a
+	ld a, b
+	ld [wPlusShinyRolls], a
+	pop af
+	ldh [rWBK], a
+	ret
+
+; ============================================================================
+; The shiny chain
+;
+; Beat or catch the same species over and over and its DVs get re-rolled more
+; times per encounter, which is the only thing shininess in this generation
+; responds to. Beating a different species starts the count again on that one.
+;
+; Only a defeat or a catch moves the count. Fleeing, being fled from and
+; whiting out all leave it alone: nothing died, so nothing changed.
+;
+; The state is three bytes of SRAM, written as the battle ends rather than
+; when the player saves. A one-off encounter can therefore be chained by
+; beating it and resetting without saving: the overworld rolls back to the
+; last save and the chain does not.
+; ============================================================================
+
+PlusChainLoad:
+; Reads the chain into de: d = species, e = count. Both come back zero when
+; SRAM has never held a chain, so a fresh cartridge reads as no chain rather
+; than as whatever those bytes happened to be.
+;
+; Leaves SRAM open on the chain's bank; every caller closes it.
+	ld a, BANK(sPlusChainCheck)
+	call OpenSRAM
+	ld a, [sPlusChainCheck]
+	cp PLUS_CHAIN_MAGIC
+	jr nz, .blank
+	; One byte of magic is not proof: a cartridge that has never held a chain
+	; lands on it once in 256, and GetPokemonName indexes its list without a
+	; bound, so a species past the end would print ten tiles of ROM as a name.
+	ld a, [sPlusChainSpecies]
+	cp NUM_POKEMON + 1
+	jr nc, .blank
+	ld d, a
+	ld a, [sPlusChainCount]
+	ld e, a
+	ret
+
+.blank
+	ld de, 0
+	ret
+
+PlusChainStore:
+; d = species, e = count. Stamps the magic alongside so the next read trusts
+; what it finds.
+	ld a, BANK(sPlusChainCheck)
+	call OpenSRAM
+	ld a, PLUS_CHAIN_MAGIC
+	ld [sPlusChainCheck], a
+	ld a, d
+	ld [sPlusChainSpecies], a
+	ld a, e
+	ld [sPlusChainCount], a
+	jp CloseSRAM
+
+PlusChainReset::
+; Called when a new game starts. The chain outlives a save file otherwise,
+; since nothing in the normal new-game path goes near this corner of SRAM.
+	ld de, 0
+	jp PlusChainStore
+
+PlusUpdateChain::
+; Runs as a battle ends, while wBattleMode and the species are still live:
+; CleanUpBattleRAM wipes both a moment later.
+	ld a, [wBattleMode]
+	dec a ; WILDMON
+	ret nz ; a trainer's mon is not a wild encounter, so the chain stands
+
+	; Only a win moves the count. A catch counts as one: it sets WIN too.
+	ld a, [wBattleResult]
+	and $f
+	ret nz ; WIN is zero; fled, lost or drew leaves the chain alone
+
+	; wTempWildMonSpecies, not wTempEnemyMonSpecies: catching a Transformed
+	; mon overwrites the latter with Ditto, which is a vanilla bug this has no
+	; business inheriting. This one is set by the encounter tables and by the
+	; script command that starts a static battle, and survives until
+	; CleanUpBattleRAM, which runs a moment after this.
+	ld a, [wTempWildMonSpecies]
+	and a
+	ret z
+	ld b, a
+
+	call PlusChainLoad
+	ld a, d
+	cp b
+	jr nz, .different
+
+	inc e
+	jr nz, .store
+	dec e ; the count is a byte, so hold it at the top rather than wrap
+	jr .store
+
+.different
+	ld d, b
+	ld e, 1
+
+.store
+	call PlusChainStore
+	ret
+
+PlusChainRollsFor:
+; b = the species about to be generated. Returns the DV roll allowance it has
+; earned in a, or zero when it has earned none.
+	call PlusChainLoad
+	call CloseSRAM
+	ld a, d
+	and a
+	ret z ; no chain at all
+
+	cp b
+	jr z, .same
+	xor a
+	ret ; the chain is on something else, so this mon gets nothing
+
+.same
+	; Walk the table from the longest chain down and take the first row the
+	; count reaches. e holds the count.
+	ld hl, PlusChainTiers
+	ld c, PLUS_CHAIN_TIERS
+.find
+	ld a, [hli]
+	cp e
+	jr z, .found
+	jr c, .found
+	inc hl ; step over the roll count this row would have given
+	dec c
+	jr nz, .find
+	xor a
+	ret ; shorter than the first tier, so the game's own single roll stands
+
+.found
+	ld a, [hl]
+	ret
+
+PlusChainTiers:
+; Longest chain first: the shortest chain that earns the row, then the rolls
+; it earns. Held here rather than computed so the curve is one thing to read.
+	db 40, 32 ; about one in 256
+	db 30, 16 ; about one in 512
+	db 20,  8 ; about one in 1024
+	db 10,  4 ; about one in 2048
+	assert PLUS_CHAIN_TIERS * 2 == PlusChainTiersEnd - PlusChainTiers
+PlusChainTiersEnd:
+
+PlusChainActive:
+; Carry set when there is a chain worth showing, with it left in de.
+	call PlusChainLoad
+	call CloseSRAM
+	ld a, d
+	and a
+	jr z, .none
+	ld a, e
+	and a
+	jr z, .none
+	scf
+	ret
+
+.none
+	and a
+	ret
+
+PlusDrawMenuAccountBox::
+; Stands in for the box the start menu clears behind its item descriptions.
+; A running chain buys it two more rows on top of the usual five, so the two
+; description lines below keep the rows they have always had: the game spaces
+; those two rows apart, which leaves nothing free inside the original box.
+	call PlusChainActive
+	jr c, .with_chain
+
+	hlcoord 0, 13
+	lb bc, 5, 10
+	call ClearBox
+	hlcoord 0, 13
+	lb bc, 3, 8 ; TextboxPalette wants the inside, not the whole box
+	jp TextboxPalette
+
+.with_chain
+	hlcoord 0, 10
+	lb bc, 8, 10
+	call ClearBox
+	hlcoord 0, 10
+	lb bc, 6, 8
+	jp TextboxPalette
+
+PlusPrintChainStatus::
+; Fills the two rows a running chain adds to the top of the start menu's
+; description box: what is being chained, and how far in.
+;
+; Prints nothing when there is no chain, rather than a "none" line that would
+; sit there for the whole game before the feature is ever used.
+	call PlusChainActive
+	ret nc
+
+	ld a, e
+	ld [wStringBuffer2], a ; PrintNum reads a byte out of memory, not a register
+	ld a, d
+	ld [wNamedObjectIndex], a
+	call GetPokemonName ; leaves the name in de, ready for PlaceString
+	hlcoord 0, 11
+	call PlaceString
+
+	hlcoord 0, 12
+	ld de, .ChainString
+	call PlaceString
+	hlcoord 5, 12
+	ld de, wStringBuffer2
+	lb bc, 1, 3 ; one byte, three digits: the count stops at 255
+	call PrintNum
+	ret
+
+.ChainString:
+	db "Chain@"
+
+PlusRollWildDVs::
+; Stands in for the two BattleRandom calls a wild or static encounter makes to
+; roll its DVs, and returns the pair in bc exactly as they did. A chain on this
+; species buys re-rolls; anything else gets the single roll the game gives.
+;
+; Static encounters come through here too. They cannot be chained by beating
+; them repeatedly, but the chain is written to SRAM as the battle ends, so
+; beating one and resetting without saving keeps the increment.
+	push de
+	push hl
+
+	; Only an actual wild or static encounter draws on the chain. Nothing else
+	; can arrive here: LoadEnemyMon.InitDVs hands every other battle mode, out
+	; of battle included, to GetTrainerDVs before the wild branch begins. The
+	; check is kept so this routine reads correctly on its own.
+	ld e, 0
+	ld a, [wBattleMode]
+	dec a ; WILDMON
+	jr nz, .rolled_none
+	ld a, [wTempWildMonSpecies]
+	ld b, a
+	call PlusChainRollsFor
+	ld e, a
+
+.rolled_none
+
+	call BattleRandom
+	ld b, a
+	call BattleRandom
+	ld c, a
+
+	ld d, 1 ; draw from BattleRandom, the source the battle engine uses
+	call PlusRerollDVs
+	pop hl
+	pop de
+	ret
+
+PlusBoostShinyDVs::
+; bc holds the DV pair the game just rolled for a mon a script is handing over.
+; Re-rolls it while wPlusShinyRolls allows.
+;
+; de points at where the caller is about to store these, so it is kept here.
+; hl the farcall overwrites on the way in, so the call site is what saves that
+; one; only bc changes.
+	push de
+	push hl
+
+	ldh a, [rWBK]
+	ld d, a
+	ld a, BANK(wPlusShinyRolls)
+	ldh [rWBK], a
+	ld a, [wPlusShinyRolls]
+	ld e, a
+	xor a
+	ld [wPlusShinyRolls], a ; an allowance is spent once, not left lying set
+	ld a, d
+	ldh [rWBK], a
+
+	ld d, 0 ; draw from Random: nothing outside a battle needs the other one
+	call PlusRerollDVs
+
+	pop hl
+	pop de
+	ret
+
+PlusRerollDVs:
+; bc holds a DV pair that has already been rolled once. e is how many pairs may
+; be examined in total, counting that one, or zero to leave the pair alone. d
+; selects the source of any further rolls: zero for Random, nonzero for
+; BattleRandom, which is what the battle engine uses so a link battle stays in
+; step. Neither RNG touches de, so the count and the selector survive them.
+;
+; Re-rolls until the pair comes up shiny or the allowance runs out, and keeps
+; whatever the last roll gave if it never does.
+;
+; This is the whole mechanism: shininess in this generation is nothing but the
+; DVs, so another chance at one is another roll of them. That makes the number
+; of rolls the only dial, and the odds follow it at about N in 8192. It also
+; means a shiny found this way is a real one, with any of the eight Attack DVs
+; a shiny can have, rather than one fixed pair forced into place.
+	ld a, e
+	and a
+	ret z ; no allowance, so the roll the game already made stands
+
+.roll
+	call PlusIsShinyDVs
+	ret c
+	dec e
+	ret z
+
+	call .next
+	ld b, a
+	call .next
+	ld c, a
+	jr .roll
+
+.next
+	ld a, d
+	and a
+	jp z, Random
+	jp BattleRandom
+
+PlusIsShinyDVs:
+; bc holds a DV pair. Returns carry when it is a shiny one.
+;
+; The same four tests CheckShininess makes, on DVs held in registers rather
+; than in memory, so a roll can be judged before anything stores it.
+	ld a, b
+	and SHINY_ATK_MASK << 4
+	jr z, .not_shiny
+
+	ld a, b
+	and %1111
+	cp SHINY_DEF_DV
+	jr nz, .not_shiny
+
+	ld a, c
+	and %1111 << 4
+	cp SHINY_SPD_DV << 4
+	jr nz, .not_shiny
+
+	ld a, c
+	and %1111
+	cp SHINY_SPC_DV
+	jr nz, .not_shiny
+
+	scf
+	ret
+
+.not_shiny
+	and a
 	ret
 
 PlusCheckWildOn::

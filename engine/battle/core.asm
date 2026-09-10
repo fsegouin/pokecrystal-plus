@@ -6122,10 +6122,7 @@ LoadEnemyMon:
 
 .GenerateDVs:
 ; Generate new random DVs
-	call BattleRandom
-	ld b, a
-	call BattleRandom
-	ld c, a
+	farcall PlusRollWildDVs ; plus: rolls bc, re-rolling while a chain allows
 
 .UpdateDVs:
 ; Input DVs in register bc
@@ -8036,6 +8033,7 @@ StartBattle:
 	push af
 	call BattleIntro
 	call DoBattle
+	farcall PlusUpdateChain ; plus: settle it before CleanUpBattleRAM wipes the species
 	call ExitBattle
 	call PlusUpdateOverworldSpeed ; plus: while the screen is still down
 	pop af

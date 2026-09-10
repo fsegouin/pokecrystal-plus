@@ -368,18 +368,15 @@ endr
 	ret z
 	call ._DrawMenuAccount
 	decoord 0, 14
-	jp .MenuDesc
+	call .MenuDesc
+	farcall PlusPrintChainStatus ; plus: the shiny chain, under the description
+	ret
 
 ._DrawMenuAccount:
 	call .IsMenuAccountOn
 	ret z
-	hlcoord 0, 13
-	lb bc, 5, 10
-	call ClearBox
-	hlcoord 0, 13
-	ld b, 3
-	ld c, 8
-	jp TextboxPalette
+	farcall PlusDrawMenuAccountBox ; plus: taller while a chain is running
+	ret
 
 .IsMenuAccountOn:
 	ld a, [wOptions2]

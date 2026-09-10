@@ -3792,6 +3792,11 @@ wPlusStarterSlots:: ds 3
 ; over is the one whose name and picture were shown
 wPlusMappedSpecies:: db
 
+; plus: how many times the next mon generated rolls its DVs, or zero for the
+; single roll the game does on its own. Transient, and deliberately not in the
+; saved block: nothing should carry it across a load.
+wPlusShinyRolls:: db
+
 ; plus: the battle HUD name row, composed at run time in the narrow font.
 ; Request1bpp blocks until the transfer is done and never touches rWBK, so
 ; the bank selected around the call is still selected when VBlank reads this.

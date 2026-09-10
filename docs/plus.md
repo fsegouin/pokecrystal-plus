@@ -59,6 +59,8 @@ hook registry below is the complete list either way.
 | `wPlusFlags` (1) | saved; same carve-out | bit 0 wild on · bits 1-2 mode · bit 3 trainers · bit 4 exp boost |
 | `wPlusWildMap`, `wPlusWildInverseMap` (252 each) | WRAMX bank 2, `"Plus RAM"` | rebuilt from the seed on load; not saved |
 | `wPlusRandState` (2), `wPlusStarterSlots` (3), `wPlusMappedSpecies` (1) | WRAMX bank 2, `"Plus RAM"` | build scratch and script hand-off; not saved |
+| `wPlusShinyRolls` (1) | WRAMX bank 2, `"Plus RAM"` | how many times the next mon generated rolls its DVs; spent by the roll it pays for, never saved |
+| `sPlusChainCheck`, `sPlusChainSpecies`, `sPlusChainCount` (1 each) | SRAM bank 0, carved from padding after the Mystery Gift block | the shiny chain. Written as a battle ends, not when the player saves, and outside both save checksums |
 | `wPlusOptionsPage` (1) | WRAM0; carved from padding before `wJumptableIndex` | which options page is showing; menu-local, never saved |
 | `FRAME_RATE_60_F` | `wOptions2` bit 1 | saved with the other options; set in `data/default_options.asm`, so a new game starts at 60 fps |
 | ROM code and data | `"Plus"` section, bank `$7f` | ~15 KB free below the Stadium checksums |
@@ -75,6 +77,7 @@ Every place vanilla code is modified. Keep this current.
 | `constants/ram_constants.asm` | `wOptions2` block | 60 fps | `FRAME_RATE_60_F` bit |
 | `ram/wram.asm` | before `wEventFlags` | storage | `wPlusSeed`, `wPlusFlags` carved from `ds 100` |
 | `ram/wram.asm` | new section | storage | `"Plus RAM"` |
+| `ram/sram.asm` | after the Mystery Gift block | chain | `sPlusChainCheck`, `sPlusChainSpecies`, `sPlusChainCount` carved from `ds $30` |
 | `layout.link` | `WRAMX 2`, `ROMX $7f` | storage | section placement |
 | `main.asm` | before Stadium checksums | storage | `"Plus"` section |
 | `includes.asm` | constants | storage | `plus_constants.asm` |
@@ -94,6 +97,10 @@ Every place vanilla code is modified. Keep this current.
 | `maps/ElmsLab.asm` | `PlusWildAideScript.Chaos`, `.ChaosConfirmOnly`, `.NewPatternOnly`, `.DoReroll`, `.ChaosHasNoPattern` | wild | chaos asks the pattern question only while a starter is still unclaimed, since the seed still moves the three balls; after that it skips it and says so if the menu asks for a reroll |
 | `maps/ElmsLab.asm` | `AideText_AlwaysBusy` | wild | "only two of us" becomes three, since the lab has a third occupant now |
 | `main.asm` | `"Plus"` section | HUD | `INCLUDE "engine/plus/hud_font.asm"` |
+| `engine/pokemon/move_mon.asm` | `GeneratePartyMonStats`, the DV roll | chain | `PlusBoostShinyDVs`, which re-rolls the DVs while `wPlusShinyRolls` allows, so a mon a script hands over comes up shiny about one time in 512 rather than one in 8192 |
+| `engine/battle/core.asm` | `LoadEnemyMon.GenerateDVs` | chain | `PlusRollWildDVs` replaces the two `BattleRandom` calls; every wild and static encounter rolls here, while roamers and the Red Gyarados branch off before it |
+| `engine/battle/core.asm` | `StartBattle`, between `DoBattle` and `ExitBattle` | chain | `PlusUpdateChain`, the one place a battle ends with `wBattleMode` and the species still readable |
+| `engine/menus/start_menu.asm` | `._DrawMenuAccount`, `.PrintMenuAccount` | chain | `PlusDrawMenuAccountBox` and `PlusPrintChainStatus` put the chain above the item description |
 | `engine/plus/hud_font.asm` | whole file | HUD | the condensed name font and the row composer |
 | `engine/battle/core.asm` | `_LoadBattleFontsHPBar` | HUD | `PlusHUDInvalidate`, since that reload blanks the composed rows |
 | `gfx/title/logo.png` | whole file | title | a `+` after CRYSTAL, the name condensed to make room |
@@ -168,10 +175,10 @@ Every place vanilla code is modified. Keep this current.
 
 ## Design notes
 
-**Wild randomizer.** A permutation over the 150-species pool in
+**Wild randomizer.** A permutation over the 166-species pool in
 `data/plus/wild_tiers.asm` (everything with a wild source in vanilla, plus
-Game Corner prizes and the three starters, minus the 11 legendaries and
-Unown), built once from `wPlusSeed`
+Game Corner prizes, the three starters and sixteen species with no vanilla
+source at all, minus the 11 legendaries and Unown), built once from `wPlusSeed`
 with Fisher-Yates and applied at encounter time. Tiered mode permutes
 within the A/B/C lists in `data/plus/wild_tiers.asm`; untiered permutes the
 union. Chaos mode ignores the permutation and rolls any of the 239
@@ -606,3 +613,45 @@ else. Moving the font to bank 1 would mean setting a bank bit on every cell of
 every text-bearing screen in the game, and providing bank 1 copies of every
 non-font tile that shares those cells (the box frame, the cursor, HP bars, item
 icons). That is a rewrite of the graphics model, not a menu fix.
+
+## The shiny chain
+
+Shininess in this generation is nothing but the DVs, so an extra chance at a
+shiny is literally an extra roll of them. Every path that wants better odds
+therefore sets one number, a count of DV rolls, and `PlusRerollDVs` spends it:
+it re-rolls until the pair comes up shiny or the count runs out. N rolls come
+to about N in 8192. A shiny found this way is a real one, with any of the eight
+Attack DVs a shiny can have, rather than one fixed pair forced into place.
+
+Beating or catching the same species over and over builds a chain. Beating a
+different one starts the count again on that one. Only a defeat or a catch
+moves the count: fleeing, being fled from and whiting out all leave it alone,
+because nothing died.
+
+| chain | rolls | odds |
+|---|---|---|
+| 0-9 | 1 | 1/8192 |
+| 10-19 | 4 | 1/2048 |
+| 20-29 | 8 | 1/1024 |
+| 30-39 | 16 | 1/512 |
+| 40+ | 32 | 1/256 |
+
+The count is one byte and holds at 255 rather than wrapping.
+
+The state lives in SRAM rather than in the saved game block, and is written the
+moment a battle ends rather than when the player saves. That is deliberate: it
+is what makes a one-off encounter chainable. Beat a legendary, reset without
+saving, and the world rolls back to the last save while the chain keeps the
+increment. Static encounters roll their DVs through the same hook as wild ones,
+so the chain applies to both.
+
+Three bytes sit in the padding after the Mystery Gift block, outside both save
+checksums, so writing them mid-session corrupts nothing. A magic byte guards
+them, so a cartridge whose SRAM has never held a chain reads as no chain rather
+than as whatever those bytes happened to be. `PlusInitNewGame` clears them,
+since nothing in the normal new-game path goes near that corner of SRAM.
+
+While a chain is running, the start menu's description box grows by two rows
+and names the species and the count above the item description. The game spaces
+its two description lines a row apart, so there is nothing free inside the
+original box to borrow.
