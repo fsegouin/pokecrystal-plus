@@ -90,7 +90,7 @@ Every place vanilla code is modified. Keep this current.
 | `maps/ElmsLab.asm` | 165-187, 199-221, 231-253 | wild | the three poke ball scripts show and give the mapped starter |
 | `maps/ElmsLab.asm` | 267, 592, 1156 | wild | `PlusOfferStarterScript`, `PlusWildAideScript`, aide text |
 | `maps/ElmsLab.asm` | `ElmDirectionsText3` | wild | Elm points the player at the new aide, the one moment everyone is stood in the lab |
-| `maps/ElmsLab.asm` | `PlusWildAideScript.Chaos`, `.NewPatternOnly`, `.ChaosHasNoPattern` | wild | chaos skips the pattern question, and says so if the menu asks for a reroll |
+| `maps/ElmsLab.asm` | `PlusWildAideScript.Chaos`, `.ChaosConfirmOnly`, `.NewPatternOnly`, `.DoReroll`, `.ChaosHasNoPattern` | wild | chaos asks the pattern question only while a starter is still unclaimed, since the seed still moves the three balls; after that it skips it and says so if the menu asks for a reroll |
 | `maps/ElmsLab.asm` | `AideText_AlwaysBusy` | wild | "only two of us" becomes three, since the lab has a third occupant now |
 | `gfx/title/logo.png` | whole file | title | a `+` after CRYSTAL, the name condensed to make room |
 | `maps/GoldenrodGameCorner.asm` | 183-195, 205-217, 227-239 | wild | three prize scripts name and give the mapped species |

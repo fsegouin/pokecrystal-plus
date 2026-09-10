@@ -633,8 +633,17 @@ PlusWildAideScript: ; plus:
 
 .Chaos:
 ; plus: chaos rolls afresh at every encounter and never builds a permutation,
-; so wPlusSeed has nothing to feed. Skip the pattern question the other two
-; modes ask and go straight to the confirmation.
+; so a new seed has no wild map to feed. It does still pick the three starters
+; until one is taken, so the pattern question is worth asking in that window
+; and pointless afterwards.
+	checkevent EVENT_GOT_A_POKEMON_FROM_ELM
+	iftrue .ChaosConfirmOnly
+	scall .AskPatternThenConfirm
+	iffalse .Declined
+	setval PLUS_WILD_MODE_CHAOS
+	sjump .Apply
+
+.ChaosConfirmOnly:
 	writetext PlusAideConfirmText
 	yesorno
 	iffalse .Declined
@@ -652,10 +661,15 @@ PlusWildAideScript: ; plus:
 ; plus: the menu offers this whatever the mode, but under chaos there is no
 ; permutation for a reroll to rebuild, so say so instead. Note the seed also
 ; feeds PlusComputeStarterSlots, so a reroll would still move the three
-; starters until one is taken. PlusCheckWildOn returns the mode plus one, and
-; the verticalmenu above has already overwritten wScriptVar.
+; starters until one is taken, so gate on that rather than on the mode alone.
+; PlusCheckWildOn returns the mode plus one, and the verticalmenu above has
+; already overwritten wScriptVar.
 	special PlusCheckWildOn
-	ifequal PLUS_WILD_MODE_CHAOS + 1, .ChaosHasNoPattern
+	ifnotequal PLUS_WILD_MODE_CHAOS + 1, .DoReroll
+	checkevent EVENT_GOT_A_POKEMON_FROM_ELM
+	iftrue .ChaosHasNoPattern
+
+.DoReroll:
 	writetext PlusAideConfirmText
 	yesorno
 	iffalse .Declined
