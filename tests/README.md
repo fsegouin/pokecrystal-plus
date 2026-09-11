@@ -16,6 +16,14 @@ PyBoy-driven checks for Pokémon Crystal+ features. Not part of `make`.
     .venv/bin/python tests/measure_overworld.py # overworld loop timings
     .venv/bin/python tests/compare_builds.py other.gbc
 
+`make_chain_save.py` starts from `fps60.sav` and writes `chain0.sav` and
+`chain39.sav` to `tests/states/`: standing in the Route 34 grass with a
+healthy party, with no chain and one win from the top tier.
+`give_radar.py <name>` (default `chain39`) puts the POKé RADAR into
+`tests/states/<name>.sav` in place, going through the game's own
+`SaveGameData`, since the key items pocket is inside the checksummed save
+block and cannot be patched in the file.
+
 `battle_now.py` drops you straight into a battle in a window, to look at the
 HUD: `.venv/bin/python tests/battle_now.py`. It writes a party mon of its own,
 because the saves ship with an empty party and a trainer battle that cannot
@@ -27,9 +35,9 @@ Most of `test_wild.py` needs no save state. It boots the ROM, mashes through
 the new game flow once, and from there calls the routines under test directly:
 it parks the CPU in a two byte loop in HRAM, sets the registers and program
 counter, and reads the result out of WRAM. That covers the map builder and the
-vanilla encounter routines at their hook sites without walking to a route. The
-shiny and chain checks are the exception: they load `tests/states/fps60.sav`,
-since they need a party and a start menu to look at.
+vanilla encounter routines at their hook sites without walking to a route.
+The few shiny and chain checks that need a party or a start menu to look at
+are the exception: they load `tests/states/fps60.sav`.
 
 ## Hand-offs: battery saves and states
 
@@ -93,5 +101,9 @@ clone has to make them once with `playtest.py`:
   `fps60.sav` alone;
 * `gamecorner.sav`, in front of the Goldenrod prize vendor, used by
   `test_text.py`.
+
+`chain0.sav` and `chain39.sav` are not expected by any check;
+`make_chain_save.py` makes them for playing the chain by hand, and needs
+`fps60.sav` first.
 
 A script whose save is missing reports it as a failure, not a skip.

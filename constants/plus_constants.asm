@@ -71,11 +71,29 @@ DEF PLUS_HUD_WIDE_FIRST EQU 72 ; glyphs from here on are the originals, 8 wide
 ; a chain reads as no chain rather than as whatever was in those bytes.
 DEF PLUS_CHAIN_MAGIC EQU $c5
 
+; plus: written over sPlusChainOff to switch chaining off, and nothing else
+; means off. SRAM that has never been written reads as $ff on a lot of
+; cartridges and as $00 on others, so a plain non-zero test would switch the
+; feature off for anyone whose save predates the byte.
+DEF PLUS_CHAIN_OFF EQU $0f
+
+; plus: what each row of a POKe RADAR menu does. Each menu offers only what
+; makes sense in the state it is shown in, so the rows move from one menu to
+; the next, and the row is looked up in that menu's action table rather than
+; read off the cursor.
+	const_def
+	const PLUS_RADAR_CHECK
+	const PLUS_RADAR_CLEAR
+	const PLUS_RADAR_SWITCH
+	const PLUS_RADAR_CANCEL
+
 ; plus: the chain pays out in DV rolls, on the same allowance the script gift
 ; uses. Each row is the shortest chain that earns that many rolls, highest
 ; first, so the lookup is a walk down the table until one fits. N rolls come to
 ; about N in 8192, so this runs 1/2048, 1/1024, 1/512, 1/256.
 DEF PLUS_CHAIN_TIERS EQU 4
+; floor, DV rolls, encounter picks, then a pointer to how the tier reads
+DEF PLUS_CHAIN_TIER_LENGTH EQU 5
 
 ; plus: how many times a mon handed over by a script rolls its DVs. Shininess
 ; in this generation is nothing but the DVs, so an extra chance is literally an

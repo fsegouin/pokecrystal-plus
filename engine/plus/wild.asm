@@ -478,6 +478,8 @@ PlusInitNewGame::
 	xor a
 	call PlusWriteFlags
 	call PlusChainReset
+	xor a
+	call PlusChainWriteOff
 	; fallthrough
 
 PlusGenerateSeed::
@@ -684,8 +686,8 @@ PlusGiveScriptMon::
 	ld [wCurPartySpecies], a
 
 	; A mon the game hands you is one you keep, so make it worth looking at.
-	; The allowance is a plain count of DV rolls, which is what a chain would
-	; raise too if one is ever added.
+	; The allowance is a plain count of DV rolls, the same currency the chain
+	; pays out in.
 	ld a, PLUS_SHINY_ROLLS_SCRIPT
 	call PlusSetShinyRolls
 
@@ -722,20 +724,25 @@ PlusSetShinyRolls:
 ; Only a defeat or a catch moves the count. Fleeing, being fled from and
 ; whiting out all leave it alone: nothing died, so nothing changed.
 ;
-; The state is three bytes of SRAM, written as the battle ends rather than
-; when the player saves. A one-off encounter can therefore be chained by
-; beating it and resetting without saving: the overworld rolls back to the
-; last save and the chain does not.
+; The state is four bytes of SRAM: three for the chain, written as the battle
+; ends rather than when the player saves, and the POKe RADAR's off switch
+; beside them. A one-off encounter can therefore be chained by beating it and
+; resetting without saving: the overworld rolls back to the last save and the
+; chain does not.
 ; ============================================================================
 
 PlusChainLoad:
 ; Reads the chain into de: d = species, e = count. Both come back zero when
 ; SRAM has never held a chain, so a fresh cartridge reads as no chain rather
-; than as whatever those bytes happened to be.
+; than as whatever those bytes happened to be, and when chaining is switched
+; off.
 ;
 ; Leaves SRAM open on the chain's bank; every caller closes it.
 	ld a, BANK(sPlusChainCheck)
 	call OpenSRAM
+	ld a, [sPlusChainOff]
+	cp PLUS_CHAIN_OFF
+	jr z, .blank ; switched off, so nothing anywhere sees a chain
 	ld a, [sPlusChainCheck]
 	cp PLUS_CHAIN_MAGIC
 	jr nz, .blank
@@ -796,6 +803,9 @@ PlusUpdateChain::
 	ld b, a
 
 	call PlusChainLoad
+	ld a, [sPlusChainOff] ; PlusChainLoad left SRAM open on the chain's bank
+	cp PLUS_CHAIN_OFF
+	jr z, .leave ; switched off: do not even keep count
 	ld a, d
 	cp b
 	jr nz, .different
@@ -813,6 +823,31 @@ PlusUpdateChain::
 	call PlusChainStore
 	ret
 
+.leave
+	jp CloseSRAM
+
+PlusChainFindTier:
+; e = the chain count. Returns carry with hl on its row in PlusChainTiers, or
+; no carry when the chain is shorter than the first tier.
+	ld hl, PlusChainTiers
+	ld c, PLUS_CHAIN_TIERS
+.find
+	ld a, [hli]
+	cp e
+	jr z, .found
+	jr c, .found
+	rept PLUS_CHAIN_TIER_LENGTH - 1
+	inc hl ; the rest of a row this chain is too short for
+	endr
+	dec c
+	jr nz, .find
+	and a
+	ret
+
+.found
+	scf
+	ret
+
 PlusChainRollsFor:
 ; b = the species about to be generated. Returns the DV roll allowance it has
 ; earned in a, or zero when it has earned none.
@@ -828,18 +863,8 @@ PlusChainRollsFor:
 	ret ; the chain is on something else, so this mon gets nothing
 
 .same
-	; Walk the table from the longest chain down and take the first row the
-	; count reaches. e holds the count.
-	ld hl, PlusChainTiers
-	ld c, PLUS_CHAIN_TIERS
-.find
-	ld a, [hli]
-	cp e
-	jr z, .found
+	call PlusChainFindTier
 	jr c, .found
-	inc hl ; step over the roll count this row would have given
-	dec c
-	jr nz, .find
 	xor a
 	ret ; shorter than the first tier, so the game's own single roll stands
 
@@ -847,15 +872,304 @@ PlusChainRollsFor:
 	ld a, [hl]
 	ret
 
+PlusChainEncounterPicks:
+; e = the chain count. Returns how many times the encounter picker may be
+; asked before the chained species is given up on, or zero for no steering.
+	call PlusChainFindTier
+	jr c, .found
+	xor a
+	ret
+
+.found
+	inc hl ; past the DV rolls, to the picks
+	ld a, [hl]
+	ret
+
 PlusChainTiers:
-; Longest chain first: the shortest chain that earns the row, then the rolls
-; it earns. Held here rather than computed so the curve is one thing to read.
-	db 40, 32 ; about one in 256
-	db 30, 16 ; about one in 512
-	db 20,  8 ; about one in 1024
-	db 10,  4 ; about one in 2048
-	assert PLUS_CHAIN_TIERS * 2 == PlusChainTiersEnd - PlusChainTiers
+; Longest chain first: the shortest chain that earns the row, the DV rolls it
+; earns, how many picks the encounter table is allowed before the chained
+; species is given up on, and how the tier reads on the POKe RADAR. Held here
+; rather than computed so the curve is one thing to read.
+;
+; The picks column is what stops a long chain being a grind. Reaching the
+; chained species N picks running is 1 - (1 - p)^N for a slot share of p, so
+; sixty picks finds a common mon essentially every time, a 4% grass slot about
+; nine times in ten, and the 1% slot a little under half the time. It never
+; reaches certainty, and a species
+; that is not in the area at all is never found however many picks are spent,
+; which is what keeps the chain honest about where you are standing.
+	db 40, 32, 60
+	dw PlusChainTierShows.Max
+	db 30, 16, 20
+	dw PlusChainTierShows.High
+	db 20,  8,  8
+	dw PlusChainTierShows.Mid
+	db 10,  4,  3
+	dw PlusChainTierShows.Low
+	assert PLUS_CHAIN_TIERS * PLUS_CHAIN_TIER_LENGTH == PlusChainTiersEnd - PlusChainTiers
 PlusChainTiersEnd:
+
+PlusChainTierShows:
+; How each tier reads on the POKe RADAR: the shiny odds, then the lure. The
+; odds are exact, N rolls being N in 8192. The lure cannot honestly be put as a
+; chance, since that depends on how common the species is where the player is
+; standing, so it is named instead.
+.None: db "1/8192@", "NONE@"
+.Low:  db "1/2048@", "LOW@"
+.Mid:  db "1/1024@", "MID@"
+.High: db "1/512@", "HIGH@"
+.Max:  db "1/256@", "MAX@"
+
+PlusRadarMenu::
+; The POKe RADAR, from the key items pocket: reads the chain out, breaks it on
+; request, and switches the whole feature off and back on. Each menu offers
+; only what makes sense in the state it is shown in, so the row the cursor
+; lands on is looked up in that menu's action table.
+	call PlusRadarPickMenu
+	push de
+	call LoadMenuHeader ; opens the window VerticalMenu draws into
+	call VerticalMenu
+	call ExitMenu ; and closes that one, not the pack's
+	pop de
+	ret c ; backed out with B
+
+	ld a, [wMenuCursorY]
+	dec a
+	add e
+	ld e, a
+	adc d
+	sub e
+	ld d, a
+	ld a, [de]
+	cp PLUS_RADAR_CHECK
+	jr z, .check
+	cp PLUS_RADAR_CLEAR
+	jr z, .clear
+	cp PLUS_RADAR_SWITCH
+	jr z, .switch
+	ret ; PLUS_RADAR_CANCEL
+
+.check
+	call PlusRadarFillReadout
+	ld hl, .NoChainText
+	jr nc, .say
+	ld hl, .ChainText
+	call MenuTextboxWaitButton
+	ld hl, .OddsText
+	jr .say
+
+.clear
+	call PlusChainReset
+	ld hl, .ClearedText
+	jr .say
+
+.switch
+	call PlusChainOff
+	ld a, TRUE ; going off
+	jr z, .write
+	xor a ; coming back on
+.write
+	call PlusChainWriteOff
+	call PlusChainOff
+	ld hl, .OffText
+	jr nz, .say
+	ld hl, .OnText
+
+.say
+	jp MenuTextboxWaitButton ; the readout has to stay up until a button
+
+; The readout sits in the string buffers, which are in WRAM bank 1, the bank
+; the pack runs on: the count in wStringBuffer2 for text_decimal, and the
+; species name, the odds and the lure in wStringBuffer1, 3 and 4 for text_ram.
+; A line carrying an embedded value ends in "@" so the control code that
+; follows is read as one, not printed as letters.
+;
+; The box is eighteen columns, and a ten letter species name will not share a
+; line with a count, so the name gets one of its own.
+; A plain string has to close with "@" before text_end. text_end is "@" too,
+; so without one the string swallows it as its own terminator and the engine
+; carries on into whatever data follows, reading it as commands.
+.NoChainText:
+	text "The RADAR is not"
+	line "tracking anything.@"
+	text_end
+
+.ChainText:
+	text "@"
+	text_ram wStringBuffer1
+	text_start ; a line is text, not a command, so a string has to be open
+	line "Chain: @"
+	text_decimal wStringBuffer2, 1, 3
+	text_end
+
+.OddsText:
+	text "Shiny: @"
+	text_ram wStringBuffer3
+	text_start
+	line "Lure: @"
+	text_ram wStringBuffer4
+	text_end
+
+.ClearedText:
+	text "The chain was"
+	line "broken.@"
+	text_end
+
+.OnText:
+	text "The RADAR is on.@"
+	text_end
+
+.OffText:
+	text "The RADAR is off.@"
+	text_end
+
+; Sized and placed as the pack's own submenus are: over the item list, whose
+; tiles are already on the text palette, and only as tall as their rows need.
+.MenuHeaderRunning:
+	db MENU_BACKUP_TILES ; flags
+	menu_coords 9, 3, SCREEN_WIDTH - 1, TEXTBOX_Y - 1
+	dw .MenuDataRunning
+	db 1 ; default option
+
+.MenuDataRunning:
+	db STATICMENU_CURSOR | STATICMENU_NO_TOP_SPACING ; flags
+	db 4 ; items
+	db "CHECK@"
+	db "CLEAR@"
+	db "TURN OFF@"
+	db "CANCEL@"
+
+.ActionsRunning:
+	db PLUS_RADAR_CHECK, PLUS_RADAR_CLEAR, PLUS_RADAR_SWITCH, PLUS_RADAR_CANCEL
+
+; On with no chain: nothing to CLEAR yet.
+.MenuHeaderIdle:
+	db MENU_BACKUP_TILES ; flags
+	menu_coords 9, 5, SCREEN_WIDTH - 1, TEXTBOX_Y - 1
+	dw .MenuDataIdle
+	db 1 ; default option
+
+.MenuDataIdle:
+	db STATICMENU_CURSOR | STATICMENU_NO_TOP_SPACING ; flags
+	db 3 ; items
+	db "CHECK@"
+	db "TURN OFF@"
+	db "CANCEL@"
+
+.ActionsIdle:
+	db PLUS_RADAR_CHECK, PLUS_RADAR_SWITCH, PLUS_RADAR_CANCEL
+
+; Off: nothing is being tracked, so nothing to CHECK or CLEAR either.
+.MenuHeaderOff:
+	db MENU_BACKUP_TILES ; flags
+	menu_coords 9, 7, SCREEN_WIDTH - 1, TEXTBOX_Y - 1
+	dw .MenuDataOff
+	db 1 ; default option
+
+.MenuDataOff:
+	db STATICMENU_CURSOR | STATICMENU_NO_TOP_SPACING ; flags
+	db 2 ; items
+	db "TURN ON@"
+	db "CANCEL@"
+
+.ActionsOff:
+	db PLUS_RADAR_SWITCH, PLUS_RADAR_CANCEL
+
+PlusRadarPickMenu:
+; Returns the menu for the state the radar is in: hl the header, de the table
+; saying what each of its rows does.
+	call PlusChainOff
+	jr nz, .off
+	call PlusChainActive
+	jr c, .running
+	ld hl, PlusRadarMenu.MenuHeaderIdle
+	ld de, PlusRadarMenu.ActionsIdle
+	ret
+
+.running
+	ld hl, PlusRadarMenu.MenuHeaderRunning
+	ld de, PlusRadarMenu.ActionsRunning
+	ret
+
+.off
+	ld hl, PlusRadarMenu.MenuHeaderOff
+	ld de, PlusRadarMenu.ActionsOff
+	ret
+
+PlusRadarFillReadout:
+; Lays the chain out where the readout text can reach it: the species name for
+; text_ram, the count for text_decimal, and the tier's odds and lure copied out
+; of ROM, since text can only print a string that sits in RAM. Returns carry
+; when there is something to show.
+	call PlusChainActive
+	ret nc
+
+	push de
+	ld a, d
+	ld [wNamedObjectIndex], a
+	call GetPokemonName ; into wStringBuffer1
+	pop de
+
+	ld a, e
+	ld [wStringBuffer2], a
+
+	call PlusChainFindTier
+	jr c, .tiered
+	ld hl, PlusChainTierShows.None
+	jr .show
+
+.tiered
+	inc hl ; past the DV rolls
+	inc hl ; and the picks, to how the tier reads
+	ld a, [hli]
+	ld h, [hl]
+	ld l, a
+.show
+	ld de, wStringBuffer3
+	call PlusCopyString ; the odds
+	ld de, wStringBuffer4
+	call PlusCopyString ; then the lure, which follows it in ROM
+	scf
+	ret
+
+PlusCopyString:
+; Copies the string at hl to de, up to and including its "@", and leaves hl
+; just past it.
+	ld a, [hli]
+	ld [de], a
+	inc de
+	cp '@'
+	jr nz, PlusCopyString
+	ret
+
+PlusChainOff:
+; Returns nz when chaining has been switched off.
+	ld a, BANK(sPlusChainOff)
+	call OpenSRAM
+	ld a, [sPlusChainOff]
+	cp PLUS_CHAIN_OFF
+	ld a, 0 ; on, unless the byte is exactly the marker
+	jr nz, .got
+	inc a
+.got
+	and a
+	push af
+	call CloseSRAM
+	pop af
+	ret
+
+PlusChainWriteOff:
+; a = non-zero to switch chaining off, zero to switch it back on.
+	and a
+	jr z, .got
+	ld a, PLUS_CHAIN_OFF
+.got
+	ld b, a
+	ld a, BANK(sPlusChainOff)
+	call OpenSRAM
+	ld a, b
+	ld [sPlusChainOff], a
+	jp CloseSRAM
 
 PlusChainActive:
 ; Carry set when there is a chain worth showing, with it left in de.
@@ -874,35 +1188,15 @@ PlusChainActive:
 	and a
 	ret
 
-PlusDrawMenuAccountBox::
-; Stands in for the box the start menu clears behind its item descriptions.
-; A running chain buys it two more rows on top of the usual five, so the two
-; description lines below keep the rows they have always had: the game spaces
-; those two rows apart, which leaves nothing free inside the original box.
-	call PlusChainActive
-	jr c, .with_chain
-
-	hlcoord 0, 13
-	lb bc, 5, 10
-	call ClearBox
-	hlcoord 0, 13
-	lb bc, 3, 8 ; TextboxPalette wants the inside, not the whole box
-	jp TextboxPalette
-
-.with_chain
-	hlcoord 0, 10
-	lb bc, 8, 10
-	call ClearBox
-	hlcoord 0, 10
-	lb bc, 6, 8
-	jp TextboxPalette
-
 PlusPrintChainStatus::
-; Fills the two rows a running chain adds to the top of the start menu's
-; description box: what is being chained, and how far in.
+; Fills the start menu's description box with the chain, and returns carry to
+; say the box is spoken for. While a chain is running it is the more useful
+; thing to have in front of you than a reminder of what PACK does, so it takes
+; the box over rather than sharing it: the game spaces those two lines a row
+; apart, which leaves nothing free inside the box to borrow.
 ;
-; Prints nothing when there is no chain, rather than a "none" line that would
-; sit there for the whole game before the feature is ever used.
+; No carry when there is no chain, and the item descriptions carry on as they
+; always have.
 	call PlusChainActive
 	ret nc
 
@@ -911,20 +1205,100 @@ PlusPrintChainStatus::
 	ld a, d
 	ld [wNamedObjectIndex], a
 	call GetPokemonName ; leaves the name in de, ready for PlaceString
-	hlcoord 0, 11
+	hlcoord 0, 14
 	call PlaceString
 
-	hlcoord 0, 12
+	hlcoord 0, 16
 	ld de, .ChainString
 	call PlaceString
-	hlcoord 5, 12
+	hlcoord 5, 16
 	ld de, wStringBuffer2
 	lb bc, 1, 3 ; one byte, three digits: the count stops at 255
 	call PrintNum
+	scf
 	ret
 
 .ChainString:
 	db "Chain@"
+
+PlusChooseChainedEncounter::
+; Stands in for the call TryWildEncounter makes to ChooseWildEncounter.
+;
+; The encounter rate is already settled by the time this runs, so this only
+; steers which species turns up, never how often a battle happens. It keeps
+; the pick the game already made and asks again while the chain allows,
+; taking the chained species the moment it comes up and putting the first
+; pick back if it never does.
+;
+; A species that is not in this area's table can never be picked, so a chain
+; on one simply spends its allowance and gets the ordinary encounter.
+;
+; ChooseWildEncounter owns bc, de and hl, and ReturnFarCall hands back the
+; callee's bc rather than ours, so everything worth keeping goes on the stack.
+	farcall ChooseWildEncounter
+	ret nz ; no encounter at all, and that is not ours to overturn
+
+	push de
+	push hl
+
+	call PlusChainLoad
+	call CloseSRAM
+	ld a, d
+	and a
+	jr z, .keep ; no chain
+	ld b, d ; the species being chained
+	call PlusChainEncounterPicks
+	and a
+	jr z, .keep ; too short a chain to steer anything
+	ld c, a ; picks this chain is allowed, counting the one already made
+
+	; Remember what the game picked, so giving up costs nothing. Its battle
+	; type goes with it: a roaming beast is picked by setting wBattleType as
+	; well as the species, and no pick after it clears that again.
+	ld a, [wTempWildMonSpecies]
+	ld d, a
+	ld a, [wCurPartyLevel]
+	ld e, a
+	push de
+	ld a, [wBattleType]
+	push af
+
+.retry
+	ld a, [wTempWildMonSpecies]
+	cp b
+	jr z, .matched
+	dec c
+	jr z, .give_up
+	; A beast passed over must not leave its type on the next pick, or an
+	; ordinary mon is fought as a roamer: its stats and HP taken from the roam
+	; slot, the chain's rolls skipped, and the slot written back to afterwards.
+	; TryWildEncounter resets it the same way when there is no battle.
+	xor a ; BATTLETYPE_NORMAL
+	ld [wBattleType], a
+	push bc
+	farcall ChooseWildEncounter
+	pop bc
+	jr .retry
+
+.matched
+	pop af ; this pick set its own battle type
+	pop de ; the remembered pick is not needed
+	jr .keep
+
+.give_up
+	pop af
+	ld [wBattleType], a
+	pop de
+	ld a, d
+	ld [wTempWildMonSpecies], a
+	ld a, e
+	ld [wCurPartyLevel], a
+
+.keep
+	pop hl
+	pop de
+	xor a ; z, the way ChooseWildEncounter reports an encounter
+	ret
 
 PlusRollWildDVs::
 ; Stands in for the two BattleRandom calls a wild or static encounter makes to

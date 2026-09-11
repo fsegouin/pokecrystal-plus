@@ -183,7 +183,7 @@ TryWildEncounter::
 ; Try to trigger a wild encounter.
 	call .EncounterRate
 	jr nc, .no_battle
-	call ChooseWildEncounter
+	farcall PlusChooseChainedEncounter ; plus: a chain steers which species
 	jr nz, .no_battle
 	call CheckRepelEffect
 	jr nc, .no_battle

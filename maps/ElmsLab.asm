@@ -592,6 +592,12 @@ AideScript_AfterTheft:
 PlusWildAideScript: ; plus:
 	faceplayer
 	opentext
+	checkitem POKE_RADAR ; plus: the radar comes from here, so a game already
+	iftrue .HasRadar     ; plus: in progress can still be given one
+	writetext PlusAideRadarText
+	waitbutton
+	verbosegiveitem POKE_RADAR
+.HasRadar:
 	special PlusCheckWildOn
 	ifnotequal 0, .AlreadyOn
 	writetext PlusAideOfferText
@@ -1173,6 +1179,22 @@ PlusTakeStarterText: ; plus:
 	line "@"
 	text_ram wStringBuffer3
 	text ", then?"
+	done
+
+PlusAideRadarText: ; plus:
+	text "Oh, before I"
+	line "forget. Take this."
+
+	para "It keeps track of"
+	line "what you've been"
+
+	para "battling. Knock out"
+	line "the same #MON"
+
+	para "over and over and"
+	line "it starts turning"
+
+	para "up rarer ones."
 	done
 
 PlusAideOfferText: ; plus:

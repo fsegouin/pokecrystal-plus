@@ -61,6 +61,7 @@ hook registry below is the complete list either way.
 | `wPlusRandState` (2), `wPlusStarterSlots` (3), `wPlusMappedSpecies` (1) | WRAMX bank 2, `"Plus RAM"` | build scratch and script hand-off; not saved |
 | `wPlusShinyRolls` (1) | WRAMX bank 2, `"Plus RAM"` | how many times the next mon generated rolls its DVs; spent by the roll it pays for, never saved |
 | `sPlusChainCheck`, `sPlusChainSpecies`, `sPlusChainCount` (1 each) | SRAM bank 0, carved from padding after the Mystery Gift block | the shiny chain. Written as a battle ends, not when the player saves, and outside both save checksums |
+| `sPlusChainOff` (1) | SRAM bank 0, beside the chain | `PLUS_CHAIN_OFF` (`$0f`) once the POKé RADAR has switched chaining off; any other value is on |
 | `wPlusOptionsPage` (1) | WRAM0; carved from padding before `wJumptableIndex` | which options page is showing; menu-local, never saved |
 | `FRAME_RATE_60_F` | `wOptions2` bit 1 | saved with the other options; set in `data/default_options.asm`, so a new game starts at 60 fps |
 | ROM code and data | `"Plus"` section, bank `$7f` | ~15 KB free below the Stadium checksums |
@@ -77,7 +78,7 @@ Every place vanilla code is modified. Keep this current.
 | `constants/ram_constants.asm` | `wOptions2` block | 60 fps | `FRAME_RATE_60_F` bit |
 | `ram/wram.asm` | before `wEventFlags` | storage | `wPlusSeed`, `wPlusFlags` carved from `ds 100` |
 | `ram/wram.asm` | new section | storage | `"Plus RAM"` |
-| `ram/sram.asm` | after the Mystery Gift block | chain | `sPlusChainCheck`, `sPlusChainSpecies`, `sPlusChainCount` carved from `ds $30` |
+| `ram/sram.asm` | after the Mystery Gift block | chain | `sPlusChainCheck`, `sPlusChainSpecies`, `sPlusChainCount`, `sPlusChainOff` carved from `ds $30` |
 | `layout.link` | `WRAMX 2`, `ROMX $7f` | storage | section placement |
 | `main.asm` | before Stadium checksums | storage | `"Plus"` section |
 | `includes.asm` | constants | storage | `plus_constants.asm` |
@@ -90,17 +91,23 @@ Every place vanilla code is modified. Keep this current.
 | `engine/events/treemons.asm` | 187-191 | wild | `SelectTreeMon` maps the species before storing it |
 | `engine/menus/intro_menu.asm` | 65 | wild | `NewGame` calls `PlusInitNewGame` after `ResetWRAM` |
 | `engine/menus/save.asm` | 610, 628 | wild | both `TryLoadSaveFile` paths rebuild the maps |
-| `maps/ElmsLab.asm` | 8, 1693 | wild | `ELMSLAB_PLUS_AIDE` object id and object event |
+| `maps/ElmsLab.asm` | 8, 1730 | wild | `ELMSLAB_PLUS_AIDE` object id and object event |
 | `maps/ElmsLab.asm` | 165-187, 199-221, 231-253 | wild | the three poke ball scripts show and give the mapped starter |
-| `maps/ElmsLab.asm` | 267, 592, 1156 | wild | `PlusOfferStarterScript`, `PlusWildAideScript`, aide text |
+| `maps/ElmsLab.asm` | 267, 592, 1184 | wild | `PlusOfferStarterScript`, `PlusWildAideScript`, aide text |
 | `maps/ElmsLab.asm` | `ElmDirectionsText3` | wild | Elm points the player at the new aide, the one moment everyone is stood in the lab |
 | `maps/ElmsLab.asm` | `PlusWildAideScript.Chaos`, `.ChaosConfirmOnly`, `.NewPatternOnly`, `.DoReroll`, `.ChaosHasNoPattern` | wild | chaos asks the pattern question only while a starter is still unclaimed, since the seed still moves the three balls; after that it skips it and says so if the menu asks for a reroll |
 | `maps/ElmsLab.asm` | `AideText_AlwaysBusy` | wild | "only two of us" becomes three, since the lab has a third occupant now |
 | `main.asm` | `"Plus"` section | HUD | `INCLUDE "engine/plus/hud_font.asm"` |
 | `engine/pokemon/move_mon.asm` | `GeneratePartyMonStats`, the DV roll | chain | `PlusBoostShinyDVs`, which re-rolls the DVs while `wPlusShinyRolls` allows, so a mon a script hands over comes up shiny about one time in 512 rather than one in 8192 |
+| `engine/overworld/wildmons.asm` | `TryWildEncounter` | chain | `PlusChooseChainedEncounter` re-picks for the chained species, after the encounter rate has already been settled |
 | `engine/battle/core.asm` | `LoadEnemyMon.GenerateDVs` | chain | `PlusRollWildDVs` replaces the two `BattleRandom` calls; every wild and static encounter rolls here, while roamers and the Red Gyarados branch off before it |
 | `engine/battle/core.asm` | `StartBattle`, between `DoBattle` and `ExitBattle` | chain | `PlusUpdateChain`, the one place a battle ends with `wBattleMode` and the species still readable |
-| `engine/menus/start_menu.asm` | `._DrawMenuAccount`, `.PrintMenuAccount` | chain | `PlusDrawMenuAccountBox` and `PlusPrintChainStatus` put the chain above the item description |
+| `engine/menus/start_menu.asm` | `.PrintMenuAccount` | chain | `PlusPrintChainStatus` fills the description box with the chain while one is running, in place of the item description |
+| `constants/item_constants.asm` | `ITEM_2D` | radar | the unused slot becomes `POKE_RADAR`, so no other item id moves |
+| `data/items/names.asm`, `attributes.asm`, `descriptions.asm` | the `$2d` entries | radar | `"# RADAR"`, a key item that cannot be tossed, and its pack description |
+| `data/items/catch_rate_items.asm` | `$2d` | radar | written as a number: the column is a catch rate, not an item, and only shares the value |
+| `engine/items/item_effects.asm` | `ItemEffects`, `PokeRadarEffect` | radar | farcalls `PlusRadarMenu` |
+| `maps/ElmsLab.asm` | `PlusWildAideScript` | radar | the aide hands the radar over to anyone without one, so a game already in progress gets it too |
 | `engine/plus/hud_font.asm` | whole file | HUD | the condensed name font and the row composer |
 | `engine/battle/core.asm` | `_LoadBattleFontsHPBar` | HUD | `PlusHUDInvalidate`, since that reload blanks the composed rows |
 | `gfx/title/logo.png` | whole file | title | a `+` after CRYSTAL, the name condensed to make room |
@@ -628,15 +635,30 @@ different one starts the count again on that one. Only a defeat or a catch
 moves the count: fleeing, being fled from and whiting out all leave it alone,
 because nothing died.
 
-| chain | rolls | odds |
-|---|---|---|
-| 0-9 | 1 | 1/8192 |
-| 10-19 | 4 | 1/2048 |
-| 20-29 | 8 | 1/1024 |
-| 30-39 | 16 | 1/512 |
-| 40+ | 32 | 1/256 |
+| chain | rolls | odds | picks | lure |
+|---|---|---|---|---|
+| 0-9 | 1 | 1/8192 | 1 | NONE |
+| 10-19 | 4 | 1/2048 | 3 | LOW |
+| 20-29 | 8 | 1/1024 | 8 | MID |
+| 30-39 | 16 | 1/512 | 20 | HIGH |
+| 40+ | 32 | 1/256 | 60 | MAX |
 
 The count is one byte and holds at 255 rather than wrapping.
+
+A chain also brings the species back more often, so a long one means fewer
+wrong mons to run from. The picks column is how many times the encounter
+table may be asked for the chained species before the pick the game already
+made is put back. Landing it in N picks is `1 - (1 - p)^N` for a slot share
+of `p`, so sixty picks finds a common mon essentially every time, a 4% grass
+slot about nine times in ten, and the 1% slot a little under half the time. It
+never reaches certainty,
+and no number of picks can find a species that does not live in the area, so
+the steering stays honest about where you are standing.
+
+This runs inside `TryWildEncounter`, after the encounter rate has already
+decided a battle happens, so it changes which mon turns up and never how
+often. Sweet Scent and the Bug Contest call the picker by other routes and
+are left alone.
 
 The state lives in SRAM rather than in the saved game block, and is written the
 moment a battle ends rather than when the player saves. That is deliberate: it
@@ -645,13 +667,42 @@ saving, and the world rolls back to the last save while the chain keeps the
 increment. Static encounters roll their DVs through the same hook as wild ones,
 so the chain applies to both.
 
-Three bytes sit in the padding after the Mystery Gift block, outside both save
+Four bytes sit in the padding after the Mystery Gift block, outside both save
 checksums, so writing them mid-session corrupts nothing. A magic byte guards
-them, so a cartridge whose SRAM has never held a chain reads as no chain rather
-than as whatever those bytes happened to be. `PlusInitNewGame` clears them,
-since nothing in the normal new-game path goes near that corner of SRAM.
+the chain, so a cartridge whose SRAM has never held one reads as no chain rather
+than as whatever those bytes happened to be. `PlusInitNewGame` clears them and
+switches chaining back on, since nothing in the normal new-game path goes near
+that corner of SRAM.
 
-While a chain is running, the start menu's description box grows by two rows
-and names the species and the count above the item description. The game spaces
-its two description lines a row apart, so there is nothing free inside the
-original box to borrow.
+While a chain is running it takes the start menu's description box over: the
+species on the first line and the count on the second, in place of the item
+description. With no chain the descriptions read as they always have.
+
+### The POKé RADAR
+
+A key item, from Elm's aide, that manages the chain from the pack:
+
+- **CHECK** reads out the species, the count, the shiny odds and how hard the
+  species is being drawn back (the lure, NONE to MAX), or says nothing is
+  being tracked.
+- **CLEAR** breaks the chain outright, leaving no species and no count, as a
+  new game does.
+- **TURN OFF** / **TURN ON** switches chaining off entirely. Off means every
+  chain routine sees no chain: no extra rolls, no steering, no count kept, and
+  nothing in the start menu. The chain itself is left alone, so turning it back
+  on picks up where it was.
+
+The menu only offers what makes sense in the state it is shown in: TURN ON and
+CANCEL alone while the radar is off, and CLEAR only while a chain is running.
+`PlusRadarPickMenu` chooses the menu, and each menu carries a table saying
+what its rows do, since the rows move from one menu to the next.
+
+Off is stored as one specific value, `PLUS_CHAIN_OFF`, rather than as any
+non-zero byte. SRAM that has never been written reads as `$ff` on many
+cartridges and emulators and as `$00` on others, so a non-zero test would have
+switched the feature off for anyone whose save predates the byte.
+
+The radar's menu sits over the pack's item list, as every pack submenu does.
+Drawing a box only replaces tiles; on the Game Boy Color each tile keeps the
+palette the attribute map gives it, so a box over the coloured pocket icon
+would print its text in the icon's colours.

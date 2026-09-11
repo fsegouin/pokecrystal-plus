@@ -213,6 +213,7 @@ PLUS_CHAIN_MAGIC = 0xC5
 WILDMON, TRAINER_BATTLE = 1, 2
 WIN, LOSE, DRAW = 0, 1, 2
 RATTATA, PIDGEY = 19, 16
+SLASH = 0xf3  # charmap "/"
 
 
 def set_chain(r, species, count):
@@ -298,6 +299,161 @@ def the_chain_pays_out_on_the_curve(r):
     assert rolls_for(PIDGEY, RATTATA, 200) == 0, \
         "a chain on another species paid out"
     assert rolls_for(PIDGEY, 0, 200) == 0, "an empty chain paid out"
+
+
+@check
+def a_passed_over_roamer_leaves_no_battle_type_behind(r):
+    """A roaming beast is picked by setting wBattleType as well as the species,
+    and the chain's re-picks can pass one over. The battle type must always
+    belong to the species that actually comes back: fought as a roamer, an
+    ordinary mon would take the beast's stats and HP from the roam slot, skip
+    the chain's shiny rolls, and write back to the slot afterwards."""
+    RAIKOU, NORMAL, ROAMING = 243, 0, 5
+    r.c.write("wRoamMon1Species", RAIKOU)
+    r.c.write("wRoamMon1Level", 40)
+    r.c.write("wRoamMon1MapGroup", ROUTE_29[0])
+    r.c.write("wRoamMon1MapNumber", ROUTE_29[1])
+    try:
+        base, _ = encounter_spread(r, 0, 0)
+        target = next(sp for sp, _ in base.most_common() if sp != RAIKOU)
+        absent = next(s for s in range(1, NUM_POKEMON + 1)
+                      if s not in base and s != RAIKOU)
+        roamers = 0
+        # A chain that wins and a chain that gives up: the leak shows on the
+        # first, and the second checks a genuine roamer keeps its own type.
+        for chain_species in (target, absent):
+            set_chain(r, chain_species, 60)
+            for _ in range(400):
+                r.c.write("wBattleType", NORMAL)
+                r.c.write("wTempWildMonSpecies", 0)
+                r.call("PlusChooseChainedEncounter")
+                sp, bt = r.c.read("wTempWildMonSpecies"), r.c.read("wBattleType")
+                if not sp:
+                    continue
+                if sp == RAIKOU:
+                    roamers += 1
+                    assert bt == ROAMING, f"the beast came back as battle type {bt}"
+                else:
+                    assert bt == NORMAL, \
+                        f"species {sp} would be fought as battle type {bt}"
+        assert roamers, "the beast never came up, so nothing here was exercised"
+    finally:
+        r.c.write("wRoamMon1MapGroup", 0)
+        r.c.write("wRoamMon1MapNumber", 0)
+        r.c.write("wBattleType", NORMAL)
+
+
+@check
+def the_radar_reads_out_odds_a_player_understands(r):
+    """CHECK shows the shiny odds and a named lure strength rather than the
+    raw counts behind them. Both come from the tier table, so a chain on each
+    side of every floor has to read the tier it has actually reached."""
+    WANT = {0: ("1/8192", "NONE"), 9: ("1/8192", "NONE"),
+            10: ("1/2048", "LOW"), 19: ("1/2048", "LOW"),
+            20: ("1/1024", "MID"), 30: ("1/512", "HIGH"),
+            40: ("1/256", "MAX"), 255: ("1/256", "MAX")}
+
+    def text(sym):
+        out, i = "", 0
+        while (t := r.c.read(sym, i)) != 0x50:
+            if 0xF6 <= t <= 0xFF:
+                out += chr(ord("0") + t - 0xF6)
+            elif 0x80 <= t <= 0x99:
+                out += chr(ord("A") + t - 0x80)
+            else:
+                out += {SLASH: "/"}.get(t, "?")
+            i += 1
+        return out
+
+    for count, want in WANT.items():
+        set_chain(r, RATTATA, count)
+        rf = r.call("PlusRadarFillReadout")
+        if count == 0:
+            assert not rf.F & 0x10, "an empty chain should have nothing to read out"
+            continue
+        got = (text("wStringBuffer3"), text("wStringBuffer4"))
+        assert got == want, f"a chain of {count} reads {got}, expected {want}"
+        assert r.c.read("wStringBuffer2") == count, "the count went missing"
+
+
+@check
+def the_radar_menu_offers_only_what_makes_sense(r):
+    """While the radar is off there is nothing to CHECK or CLEAR, and with no
+    chain running there is nothing to CLEAR. The labels are read out of the
+    ROM at the header the game actually picks, and each is checked against the
+    action its row runs, since the rows move between menus and a table that
+    drifted from its labels would run the wrong thing."""
+    CHECK, CLEAR, SWITCH, CANCEL = range(4)  # PLUS_RADAR_*
+    ACTION = {"CHECK": CHECK, "CLEAR": CLEAR, "TURN OFF": SWITCH,
+              "TURN ON": SWITCH, "CANCEL": CANCEL}
+    bank = r.c.syms["PlusRadarMenu"][0]
+
+    def rom(addr):
+        return r.c.pb.memory[bank, addr]
+
+    def menu():
+        rf = r.call("PlusRadarPickMenu")
+        header, actions = rf.HL, (rf.D << 8) | rf.E
+        # header: flags, four coordinate bytes, then the menu data pointer
+        data = rom(header + 5) | (rom(header + 6) << 8)
+        count, at, labels = rom(data + 1), data + 2, []
+        for _ in range(count):
+            text = ""
+            while rom(at) != 0x50:
+                t = rom(at)
+                text += " " if t == 0x7F else chr(ord("A") + t - 0x80)
+                at += 1
+            labels.append(text)
+            at += 1
+        for i, label in enumerate(labels):
+            assert rom(actions + i) == ACTION[label], \
+                f"{label} on row {i + 1} runs action {rom(actions + i)}"
+        return labels
+
+    r.call("PlusChainWriteOff", A=0)
+    set_chain(r, RATTATA, 12)
+    assert menu() == ["CHECK", "CLEAR", "TURN OFF", "CANCEL"]
+
+    set_chain(r, 0, 0)
+    assert menu() == ["CHECK", "TURN OFF", "CANCEL"], "no chain, nothing to clear"
+
+    set_chain(r, RATTATA, 12)
+    r.call("PlusChainWriteOff", A=1)
+    assert menu() == ["TURN ON", "CANCEL"], "off, nothing to check or clear"
+
+    r.call("PlusChainWriteOff", A=0)
+
+
+@check
+def plus_text_scripts_are_well_formed(r):
+    """Two text-script mistakes each crashed the POKe RADAR, and both are easy
+    to make again. A string command (line, para, cont...) straight after a
+    control code is read as a command number far past the end of the
+    dispatcher's table. text_end straight after a string that never closed
+    with "@" gets swallowed as that string's terminator, since text_end is
+    "@" too, and the engine runs on into whatever data follows."""
+    import glob
+    import re
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    files = glob.glob(os.path.join(root, "engine", "plus", "*.asm"))
+    files.append(os.path.join(root, "maps", "ElmsLab.asm"))
+    problems = []
+    for f in files:
+        prev = None
+        for n, line in enumerate(open(f, encoding="utf-8"), 1):
+            code = line.split(";")[0].rstrip()
+            if not code.strip():
+                continue
+            here = f"{os.path.relpath(f, root)}:{n}"
+            if prev and re.match(r"\s+(line|para|cont|next|page)\b", code) \
+                    and re.match(r"\s+text_(?!start\b)\w+", prev):
+                problems.append(f"{here}: a string command straight after a control code")
+            if prev and re.match(r"\s+text_end\b", code):
+                m = re.match(r'\s+(text|line|para|cont|next|page)\s+"(.*)"\s*$', prev)
+                if m and not m.group(2).endswith("@"):
+                    problems.append(f"{here}: text_end after a string that never closed")
+            prev = code
+    assert not problems, "\n  " + "\n  ".join(problems)
 
 
 @check
@@ -695,7 +851,8 @@ def area_screen_scans_the_vanilla_slots(r):
 
 
 def read_menu_box(c):
-    """The eight rows of the start menu's description box, as text."""
+    """Rows 10 to 17 of the left ten columns, as text: the start menu's
+    description box (rows 13 to 17) and the three rows above it."""
     def dec(t):
         t &= 0xFF
         if 0x80 <= t <= 0x99:
@@ -724,7 +881,8 @@ def sav_with_chain(species, count):
     finally:
         c.stop()
     for name, val in (("sPlusChainCheck", PLUS_CHAIN_MAGIC),
-                      ("sPlusChainSpecies", species), ("sPlusChainCount", count)):
+                      ("sPlusChainSpecies", species), ("sPlusChainCount", count),
+                      ("sPlusChainOff", 0)):  # on, whatever the base save held
         bank, addr = syms[name]
         data[bank * 0x2000 + (addr - 0xA000)] = val
     path = os.path.join(tempfile.gettempdir(), "plus_chain_menu.sav")
@@ -735,18 +893,19 @@ def sav_with_chain(species, count):
 
 @check
 def the_start_menu_shows_a_running_chain(r):
-    """The description box grows by two rows to carry the chain, and the item
-    description keeps the rows it has always had. The game double-spaces those
-    two lines, so there is nothing free inside the original box to borrow."""
+    """While a chain is running it takes the description box over: the species
+    on the first text row and the count on the second, with the item
+    description gone rather than squeezed in beside it. With no chain the box
+    reads the way it always has."""
     with Crystal(sav=os.path.join(STATES, "fps60.sav")) as c:
         c.continue_game()
         c.press("start", hold=10, release=10)
         c.run(90)
         plain = read_menu_box(c)
-    assert plain[:3] == ["", "", ""], \
-        f"with no chain the box should not have grown: {plain}"
-    desc = [row for row in plain if row]
-    assert len(desc) == 2, f"expected two description lines, got {desc}"
+    # read_menu_box starts at row 10, so rows 14 and 16 are indices 4 and 6.
+    desc = [plain[4], plain[6]]
+    assert all(desc), f"with no chain the description should show: {plain}"
+    assert not any(plain[:4]), f"nothing should sit above the box: {plain}"
 
     path = sav_with_chain(RATTATA, 37)
     try:
@@ -758,11 +917,11 @@ def the_start_menu_shows_a_running_chain(r):
     finally:
         os.remove(path)
 
-    assert chained[1] == "RATTATA", f"row 11 should name the species: {chained}"
-    assert chained[2] == "Chain 37", f"row 12 should count it: {chained}"
-    # The description has to come through untouched, on the same rows.
-    assert chained[4:] == plain[4:], \
-        f"the item description moved or was overwritten: {chained[4:]} vs {plain[4:]}"
+    assert chained[4] == "RATTATA", f"row 14 should name the species: {chained}"
+    assert chained[6] == "Chain 37", f"row 16 should count it: {chained}"
+    for line in desc:
+        assert line not in chained, \
+            f"the item description should be replaced, not kept: {chained}"
 
 
 @check
@@ -800,6 +959,71 @@ def a_wild_roll_spends_what_the_chain_earned(r):
         assert hits <= 3, f"{label} paid out: {hits} shiny in 2000"
 
     r.c.write("wBattleMode", 0)
+
+
+def encounter_spread(r, chain_species, count, trials=500):
+    """Run the encounter picker the way TryWildEncounter does, and count what
+    comes back. Returns (species -> hits, how many times no mon was picked)."""
+    from collections import Counter
+    r.call("PlusChainStore", D=chain_species, E=count)
+    r.c.write("wMapGroup", ROUTE_29[0])
+    r.c.write("wMapNumber", ROUTE_29[1])
+    r.c.write("wTimeOfDay", TIME_DAY)
+    r.c.write("wPlayerState", PLAYER_NORMAL)
+    hits, empty = Counter(), 0
+    for _ in range(trials):
+        r.c.write("wTempWildMonSpecies", 0)
+        r.call("PlusChooseChainedEncounter")
+        sp = r.c.read("wTempWildMonSpecies")
+        if sp:
+            hits[sp] += 1
+        else:
+            empty += 1
+    return hits, empty
+
+
+@check
+def a_chain_steers_which_species_turns_up(r):
+    """A long chain should mean fewer wrong mons to run from. The picker is
+    asked again while the chain allows, so the species comes up far more
+    often, without the encounter rate moving at all."""
+    base, _ = encounter_spread(r, 0, 0)
+    total = sum(base.values())
+    target, natural = base.most_common(1)[0]
+
+    def share(count):
+        hits, _ = encounter_spread(r, target, count)
+        return 100 * hits[target] / sum(hits.values())
+
+    # Below the first tier nothing is steered, so the species keeps its own
+    # share of the table. A wide band: this is a sample, not a calculation.
+    plain = 100 * natural / total
+    assert abs(share(5) - plain) < 15, \
+        f"a chain of 5 moved the odds: {share(5):.0f}% against {plain:.0f}%"
+
+    # From there it only climbs.
+    steps = [share(c) for c in (10, 20, 40)]
+    assert steps == sorted(steps), f"the curve dips: {steps}"
+    assert steps[0] > plain + 10, f"a chain of 10 did not help: {steps[0]:.0f}%"
+    assert steps[-1] > 90, f"a chain of 40 should be near certain: {steps[-1]:.0f}%"
+
+
+@check
+def steering_never_forces_a_species_that_is_not_there(r):
+    """The chain cannot conjure a mon into an area it does not live in, and
+    spending the allowance on one must leave the ordinary spread alone."""
+    base, base_empty = encounter_spread(r, 0, 0)
+    absent = next(s for s in range(1, NUM_POKEMON + 1) if s not in base)
+
+    hits, empty = encounter_spread(r, absent, 60)
+    assert hits[absent] == 0, f"species {absent} was forced into a route without it"
+    assert set(hits) == set(base), \
+        f"the spread changed: {sorted(hits)} against {sorted(base)}"
+    # The encounter rate itself is decided in TryWildEncounter before this
+    # runs and is not exercised here; this only checks the picker's own
+    # no-encounter answer is never overturned.
+    assert abs(empty - base_empty) <= 25, \
+        f"the encounter rate moved: {empty} empty against {base_empty}"
 
 
 @check

@@ -52,11 +52,12 @@ sBackupMysteryGiftItemEnd::
 ; That is the whole point of it: beat a one-off encounter, reset without
 ; saving, and the world rolls back while the chain does not. Nothing here is
 ; covered by either save checksum, so writing it mid-session corrupts nothing.
-sPlusChainCheck::   db ; PLUS_CHAIN_MAGIC once the three bytes mean anything
+sPlusChainCheck::   db ; PLUS_CHAIN_MAGIC once the bytes below mean anything
 sPlusChainSpecies:: db
 sPlusChainCount::   db
+sPlusChainOff::     db ; PLUS_CHAIN_OFF once the player switches chaining off; any other value is on
 
-	ds $2d
+	ds $2c
 
 sRTCStatusFlags:: db
 	ds 7
