@@ -13,6 +13,10 @@ PyBoy-driven checks for Pokémon Crystal+ features. Not part of `make`.
     .venv/bin/python tests/test_running.py      # running shoes (hold B)
     .venv/bin/python tests/test_text.py         # INST text speed, start menu timing
     .venv/bin/python tests/test_hud.py          # one-line battle HUD
+    .venv/bin/python tests/test_repel.py        # $1 repels, mart stock, top-off
+    .venv/bin/python tests/test_fixes.py        # vanilla bug fixes, low HP alarm
+    .venv/bin/python tests/test_matchups.py     # type matchup markers on the move list
+    .venv/bin/python tests/test_battle_menu.py  # B on the battle menu moves to RUN
     .venv/bin/python tests/measure_overworld.py # overworld loop timings
     .venv/bin/python tests/compare_builds.py other.gbc
 
@@ -29,7 +33,15 @@ HUD: `.venv/bin/python tests/battle_now.py`. It writes a party mon of its own,
 because the saves ship with an empty party and a trainer battle that cannot
 start leaves the approach script waiting on a movement forever.
 
+`matchups_now.py` does the same for the type matchup markers: a wild
+Normal/Flying type from the Route 34 grass against a lead knowing LICK,
+THUNDERSHOCK, VINE WHIP and TACKLE, so FIGHT shows ×, ▲, ▼ and a blank. It
+needs `chain0.sav`; `--check` opens FIGHT headless instead and reports what
+it finds.
+
 `tests/playtest.py` is a windowed play helper rather than a check; see below.
+`dump_options_tilemap.py <file>` writes the options screen's background
+tilemap to `<file>`, to diff between two builds.
 
 Most of `test_wild.py` needs no save state. It boots the ROM, mashes through
 the new game flow once, and from there calls the routines under test directly:
@@ -97,13 +109,14 @@ clone has to make them once with `playtest.py`:
 
 * `fps30.sav` and `fps60.sav`, the east-west stretch in Goldenrod with the
   60 fps option off and on, used by `test_running.py` and `test_text.py`;
-  `test_hud.py`, `battle_now.py` and part of `test_wild.py` need
-  `fps60.sav` alone;
+  `test_hud.py`, `test_matchups.py`, `test_battle_menu.py`, `battle_now.py`
+  and part of `test_wild.py` need `fps60.sav` alone;
 * `gamecorner.sav`, in front of the Goldenrod prize vendor, used by
   `test_text.py`.
 
-`chain0.sav` and `chain39.sav` are not expected by any check;
-`make_chain_save.py` makes them for playing the chain by hand, and needs
-`fps60.sav` first.
+`make_chain_save.py` makes `chain0.sav` and `chain39.sav` from `fps60.sav`.
+`test_repel.py` needs `chain0.sav`, since it walks real steps in the Route 34
+grass, and so does `matchups_now.py`; `chain39.sav` is only for playing the
+chain by hand.
 
 A script whose save is missing reports it as a failure, not a skip.

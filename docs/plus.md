@@ -11,6 +11,11 @@ and distributed as a BPS patch against the vanilla ROM.
 | Trainer and gym leader rematches | always on | done |
 | Shiny chain for wild and static encounters | always on, POKé RADAR turns it off | done |
 | POKé RADAR key item | Elm's aide | done |
+| $1 repels in every general mart, topped off when one wears off until you go indoors | always on | done |
+| Vanilla bug fixes: catch rate, battle engine, AI, HP bar, five-digit EXP | always on | done |
+| Low HP alarm beeps four times, then stops | always on | done |
+| Type matchup markers on the battle move list (▲ ▼ ×) | always on | done |
+| B on the battle menu moves the cursor to RUN | always on | done |
 | 60 fps overworld | Options, SELECT sub-page (on by default) | done |
 | Running shoes (hold B) | always on | done |
 | INST text speed | Options, TEXT SPEED | done |
@@ -27,7 +32,7 @@ are never randomized. The starter is the one deliberate exception.
 BPS rather than IPS: it stores CRC32s of both ROMs, so applying it to the wrong
 file is rejected rather than silently corrupting it. Released patches and the
 matching `.sym` are committed under `patches_and_info/` so the hack can be
-played without a toolchain; none has been published yet.
+played without a toolchain.
 
 `pokecrystal_vanilla.gbc` is produced by `tools/build_vanilla.sh`, which builds
 the pinned upstream commit in `tools/vanilla_ref.txt` in a temporary worktree
@@ -58,7 +63,7 @@ hook registry below is the complete list either way.
 | Symbol | Where | Notes |
 |---|---|---|
 | `wPlusSeed` (2) | saved; carved from padding before `wEventFlags` | wild shuffle seed, 0 = none yet |
-| `wPlusFlags` (1) | saved; same carve-out | bit 0 wild on · bits 1-2 mode · bit 3 trainers · bit 4 exp boost |
+| `wPlusFlags` (1) | saved; same carve-out | bit 0 wild on · bits 1-2 mode · bit 3 trainers · bit 4 exp boost · bits 5-6 repel kind · bit 7 repel auto-renew |
 | `wPlusWildMap`, `wPlusWildInverseMap` (252 each) | WRAMX bank 2, `"Plus RAM"` | rebuilt from the seed on load; not saved |
 | `wPlusRandState` (2), `wPlusStarterSlots` (3), `wPlusMappedSpecies` (1) | WRAMX bank 2, `"Plus RAM"` | build scratch and script hand-off; not saved |
 | `wPlusShinyRolls` (1) | WRAMX bank 2, `"Plus RAM"` | how many times the next mon generated rolls its DVs; spent by the roll it pays for, never saved |
@@ -66,7 +71,7 @@ hook registry below is the complete list either way.
 | `sPlusChainOff` (1) | SRAM bank 0, beside the chain | `PLUS_CHAIN_OFF` (`$0f`) once the POKé RADAR has switched chaining off; any other value is on |
 | `wPlusOptionsPage` (1) | WRAM0; carved from padding before `wJumptableIndex` | which options page is showing; menu-local, never saved |
 | `FRAME_RATE_60_F` | `wOptions2` bit 1 | saved with the other options; set in `data/default_options.asm`, so a new game starts at 60 fps |
-| ROM code and data | `"Plus"` section, bank `$7f` | ~15 KB free below the Stadium checksums |
+| ROM code and data | `"Plus"` section, bank `$7f` | ~11 KB free below the Stadium checksums |
 
 The save layout is unchanged: new bytes replace unused padding, so vanilla
 saves load with the three Scientist features and 60 fps off. The shiny chain
@@ -87,7 +92,8 @@ Every place vanilla code is modified. Keep this current.
 | `main.asm` | before Stadium checksums | storage | `"Plus"` section |
 | `includes.asm` | constants | storage | `plus_constants.asm` |
 | `Makefile` | `.PHONY`, after `tools:` | packaging | `patch` target, vanilla ROM rule |
-| `.gitignore` | end of file | packaging | venv, states, local build artifacts |
+| `.gitignore` | end of file | packaging | venv, states, local build artifacts; `!patches_and_info/*.sym` so released symbol tables are tracked |
+| `.gitattributes` | binary list | packaging | `*.bps binary`, since `* text eol=lf` would rewrite a patch's CR LF bytes and corrupt it |
 | `data/events/special_pointers.asm` | end of table | wild | seven `Plus*` specials |
 | `engine/overworld/wildmons.asm` | 32-37 | wild | `FindNest` wraps its scan in the inverse map |
 | `engine/overworld/wildmons.asm` | 326-329 | wild | `ChooseWildEncounter` maps the species it just read |
@@ -123,8 +129,8 @@ Every place vanilla code is modified. Keep this current.
 | `main.asm` | `"Plus"` section | trainers | includes `data/plus/trainer_basics.asm` and `engine/plus/trainer.asm` |
 | `engine/battle/read_trainer_party.asm` | `TrainerType1` loop | trainers | `farcall PlusRandomizeTrainerMon` between the species write and `predef TryAddMonToParty`, bracketed by `push hl` / `pop hl` |
 | `maps/CherrygrovePokecenter1F.asm` | object list, scripts, texts, object events | trainers | Scientist at (7, 3) and its yes/no toggle script |
-| `main.asm` | 690, `"Plus"` section | catch-up EXP | `INCLUDE "engine/plus/exp.asm"` |
-| `engine/battle/core.asm` | 7116, `GiveExperiencePoints` | catch-up EXP | `farcall PlusCatchUpExpBoost` after the Lucky Egg boost |
+| `main.asm` | 696, `"Plus"` section | catch-up EXP | `INCLUDE "engine/plus/exp.asm"` |
+| `engine/battle/core.asm` | 7147, `GiveExperiencePoints` | catch-up EXP | `farcall PlusCatchUpExpBoost` after the Lucky Egg boost |
 | `maps/CeladonCafe.asm` | 7, 90, 218, 297 | catch-up EXP | object const, toggle script, five texts, object at (9, 1) |
 | `engine/events/trainer_scripts.asm` | 4, 38 | rematches | `TalkToTrainerScript` branches to `OfferRematchScript`; shared `RematchOfferText` |
 | `maps/VioletGym.asm` | 16 | rematches | `.Rematch` branch off the beaten check |
@@ -183,6 +189,27 @@ Every place vanilla code is modified. Keep this current.
 | `constants/ram_constants.asm` | after `TEXT_DELAY_SLOW` | INST text | `TEXT_DELAY_INST` |
 | `home/print_text.asm` | `PrintLetterDelay` | INST text | a delay of zero takes the `NO_TEXT_SCROLL` exit |
 | `engine/menus/options_menu.asm` | `OPT_TEXT_SPEED_*`, `Options_TextSpeed`, `GetTextSpeed` | INST text | a fourth setting at the head of the cycle |
+| `main.asm` | `"Plus"` section | repel | `INCLUDE "engine/plus/repel.asm"` |
+| `data/items/attributes.asm` | `REPEL`, `SUPER_REPEL`, `MAX_REPEL` | repel | price $1, was 350, 500 and 700 |
+| `data/items/marts.asm` | `MartCherrygrove`, `MartCherrygroveDex`, `MartViolet`, `MartCianwood`, `MartEcruteak`, `MartViridian`, `MartVermilion`, `MartSaffron` | repel | a `REPEL` line and the count byte one higher |
+| `engine/items/item_effects.asm` | `UseRepel` | repel | `farcall PlusRepelUsed` before `UseItemText` |
+| `engine/overworld/events.asm` | `DoRepelStep` | repel | `farcall PlusRepelAutoRenew`; a renewed repel returns with the step counted, otherwise `PlusRepelWoreOffScript` runs in place of `RepelWoreOffScript` |
+| `engine/overworld/events.asm` | `EnterMap`, after `RunMapSetupScript` | repel | `farcall PlusRepelEnterMap` |
+| `data/text/common_2.asm` | `_BoostedExpPointsText`, `_ExpPointsText` | fixes | the gain prints five digits |
+| `engine/items/item_effects.asm` | `PokeBallEffect`, `MoonBallMultiplier`, `LoveBallMultiplier`, `FastBallMultiplier` | fixes | status and held item catch bonuses, Moon, Love and Fast Ball |
+| `engine/battle/core.asm` | `HasAnyoneFainted`, `CheckFaint_PlayerThenEnemy`, `CheckFaint_EnemyThenPlayer` | fixes | faint checks loop until nobody is left on 0 HP |
+| `engine/battle/core.asm` | `HandleBerserkGene`, `PursuitSwitch`, `CheckPlayerHasUsableMoves`, `LoadEnemyMon`, `BadgeStatBoosts`, `WildFled_EnemyFled_LinkBattleCanceled` | fixes | Berserk Gene confusion, Pursuit faint status, Struggle with PP Up, switch-in PRZ/BRN, Glacier Badge, `SFX_RUN` |
+| `engine/battle/core.asm` | `CheckDanger` | low HP alarm | clears the whole byte, beep count included |
+| `audio/engine.asm` | `UpdateChannels.Channel1`, `PlayDanger` | low HP alarm | four beeps, then the byte parks at `$ff` and channel 1 goes back to the music |
+| `engine/battle/effect_commands.asm` | `BattleCommand_EffectChance` | fixes | a 100% secondary effect never misses |
+| `engine/battle/move_effects/belly_drum.asm`, `return.asm`, `frustration.asm`, `teleport.asm` | the move's command | fixes | HP check before the boost, minimum power 1, wild Teleport level check |
+| `engine/battle/anim_hp_bar.asm` | `LongAnim_UpdateVariables`, `ShortHPBar_CalcPixelFrame` | fixes | high HP bar speed, low HP off-by-one |
+| `engine/battle/ai/items.asm` | `AI_TryItem`, `EnemyUsedFullRestore`, `AI_HealStatus` | fixes | no base reward as an item; Full Heal and Full Restore cure confusion and Nightmare and restore the stats |
+| `engine/battle/ai/scoring.asm` | `AI_Smart_Conversion2`, `AI_Smart_MeanLook` | fixes | the two inverted checks |
+| `main.asm` | `"Plus"` section | matchups | `INCLUDE "engine/plus/matchup.asm"` |
+| `engine/battle/core.asm` | `MoveSelectionScreen`, after `ListMoves` | matchups | `farcall PlusMarkMoveMatchups` |
+| `engine/battle/menu.asm` | `BattleMenuHeader`, `ContestBattleMenuHeader` | B to RUN | `STATICMENU_DISABLE_B` dropped, so B leaves the menu |
+| `engine/battle/menu.asm` | `LoadBattleMenu`, `CommonBattleMenu`, and `PlusBattleMenuB` after them | B to RUN | a B exit puts the cursor on RUN and shows the menu again |
 
 ## Design notes
 
@@ -710,3 +737,105 @@ The radar's menu sits over the pack's item list, as every pack submenu does.
 Drawing a box only replaces tiles; on the Game Boy Color each tile keeps the
 palette the attribute map gives it, so a box over the coloured pocket icon
 would print its text in the icon's colours.
+
+## Repels
+
+All three repels cost $1. Selling pays half, which rounds down to $0. Every
+general mart that sold no repel now stocks a REPEL: both Cherrygrove lists,
+Violet, the Cianwood pharmacy, Ecruteak, Viridian, Vermilion and Saffron. The
+specialist counters (TMs, vitamins, battle items, mail, souvenirs, herbs) are
+left alone.
+
+When a repel wears off with another in the pack, the message asks whether to
+use another, naming the kind. A yes uses one and switches auto-renew on: from
+then on each repel that runs out is replaced on the same step, with no
+message, until the player walks into a building or the pack runs dry. Only
+`INDOOR` maps count as buildings. Caves and gates keep it going, since those
+are where a repel is wanted most. A no, or a pack with none, leaves it at the
+wore-off message.
+
+The top-off prefers the kind last used and falls back to the weakest in the
+pack. The kind and the auto-renew bit sit in the spare bits of `wPlusFlags`,
+so they are saved with the game and cost no new bytes. A repel used from the
+pack records its kind and switches auto-renew off, so the offer is always made
+once before anything is used on the player's behalf.
+
+`DoRepelStep` tries the renewal before deciding what to run. A renewed repel
+returns with the step counted like any other, so a silent top-off opens no
+window. `RepelWoreOffScript` is left in place, unreferenced.
+
+## Vanilla fixes
+
+Rematches and randomized teams mean far more battles than a first run, so
+the bugs that show up in battle show up more often. These are pret's own
+fixes from `docs/bugs_and_glitches.md`, applied as documented. Each site keeps
+pret's title with `; BUG:` turned into `; plus: fixed:`, so
+`git grep "plus: fixed:"` lists every one.
+
+- **Catching:** burn, poison and paralysis raise the catch rate as sleep and
+  freeze do; `HELD_CATCH_CHANCE` works; the Moon Ball boosts Moon Stone
+  evolvers; the Love Ball wants the opposite gender; the Fast Ball covers
+  every mon in the flee lists rather than the first of each.
+- **Battle engine:** Perish Song and Spikes can no longer leave a mon on 0 HP;
+  a switched-in enemy takes its PRZ or BRN stat drop; the Glacier Badge
+  always boosts Special Defense; a disabled move with PP Up no longer blocks
+  Struggle; a mon that fainted to Pursuit loses its status; Berserk Gene
+  confusion lasts 2-5 turns; a 100% secondary effect never misses; Belly
+  Drum checks HP before the boost; Return and Frustration never hit for 0;
+  wild Teleport respects the level check; `SFX_RUN` plays in full.
+- **AI:** Conversion2 and Mean Look are scored the right way round; the AI
+  never takes its base reward for an item; its Full Heal and Full Restore
+  cure confusion and Nightmare and undo the PRZ and BRN stat drops.
+- **HP bar:** the long animation moves at pixel speed on high HP, and the
+  short one no longer stops a pixel early.
+- **Text:** a five-digit EXP gain prints all five digits. The catch-up
+  booster makes those common.
+
+The low HP alarm is a behaviour change rather than a pret fix. `PlayDanger`
+counts frames in bits 0-4 of `wLowHealthAlarm` and beeps in bits 5-6, so the
+fourth beep carries out of the byte and parks it at `$ff`. `PlayDanger` then
+does nothing, and `_UpdateSound` hands channel 1 back to the music.
+`CheckDanger` writes 0 rather than clearing one bit when the bar leaves red,
+so the next time it goes red the alarm starts from the first beep.
+
+## Type matchup markers
+
+The battle move list marks each move in the cell after its name, column 18,
+which the longest name (twelve letters from column 6) never reaches:
+
+- **▲** super effective against the enemy's current types, 2x or 4x;
+- **▼** resisted, 1/2x or 1/4x;
+- **×** no effect;
+- nothing when the matchup comes out even, including a 2x and a 1/2x that
+  cancel.
+
+The chart is the game's own. `BattleCheckTypeMatchup` runs once per move with
+the move's type put in the player's move struct for the moment, so Foresight
+and a type changed by Conversion count exactly as they would in the attack.
+
+Status moves, Counter and Mirror Coat get no marker. Seismic Toss, Night
+Shade, Sonic Boom, Dragon Rage, Psywave and Super Fang deal fixed damage
+through `StaticDamage`, which only checks the chart for an immunity, so they
+only ever show ×. Hidden Power shows the type its DVs give, worked out the way
+`HiddenPowerDamage` does. Only the battle's own move list is marked: Mimic's
+list of the enemy's moves and the Ether menu are not.
+
+`▼` and `×` are in the standard font. The up arrow's own slot, `$61`, holds HP
+bar graphics for the whole battle, so the list copies the game's arrow into
+`$bd` (`PLUS_MATCHUP_ARROW_TILE`), a blank standard font slot for hiragana su
+that an English build never places. Menus reload the font over it, so the
+copy runs each time the list is drawn.
+
+## B to RUN
+
+On the FIGHT / PKMN / PACK / RUN menu, B moves the cursor to RUN without
+choosing it, the way later games let a player back out of a battle quickly.
+Vanilla switched B off for this menu with `STATICMENU_DISABLE_B`. With it
+back on, B ends the menu's joypad loop without computing a choice, and
+`PlusBattleMenuB` catches that: it puts the cursor on RUN and has the caller
+draw the menu again, inside the same `LoadMenuHeader` / `ExitMenu` pair.
+A second B does nothing, the arrows work as before, and A still chooses.
+
+The Bug Contest menu (FIGHT / PKMN / PARKBALL / RUN) shares
+`CommonBattleMenu` and keeps RUN in the same corner, so it gets the same
+treatment. The unused Safari menu keeps `STATICMENU_DISABLE_B`.

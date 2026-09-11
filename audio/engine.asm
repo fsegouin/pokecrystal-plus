@@ -242,6 +242,8 @@ UpdateChannels:
 
 .Channel1:
 	ld a, [wLowHealthAlarm]
+	cp $ff ; plus: the alarm has finished, so channel 1 plays the music again
+	jr z, .Channel5 ; plus
 	bit DANGER_ON_F, a
 	ret nz
 .Channel5:
@@ -529,18 +531,23 @@ _CheckSFX:
 	ret
 
 PlayDanger:
+; plus: bits 0-4 count frames and bits 5-6 count beeps. After the fourth
+; beep the byte parks at $ff and the alarm stays quiet until CheckDanger
+; clears it.
 	ld a, [wLowHealthAlarm]
 	bit DANGER_ON_F, a
 	ret z
+	cp $ff ; plus
+	ret z ; plus
 
 	; Don't do anything if SFX is being played
-	and ~(1 << DANGER_ON_F)
-	ld d, a
+	ld d, a ; plus: the whole byte, beep count included
 	call _CheckSFX
 	jr c, .increment
+	ld a, d ; plus
 
 	; Play the high tone
-	and a
+	and $1f ; plus: the frame count alone
 	jr z, .begin
 
 	; Play the low tone
@@ -569,14 +576,23 @@ PlayDanger:
 	ldh [rAUD1HIGH], a
 
 .increment
+; plus: the frame count wraps at 30 into the next beep. The count and
+; DANGER_ON_F sit above it, so the fourth wrap carries out of the byte, which
+; is what parks it at $ff.
 	ld a, d
+	and $e0
+	ld e, a
+	ld a, d
+	and $1f
 	inc a
 	cp 30 ; Ending frame
 	jr c, .noreset
-	xor a
+	add $20 - 30 ; frames back to 0, one more beep
 .noreset
-	; Make sure the danger sound is kept on
-	or 1 << DANGER_ON_F
+	add e
+	jr nz, .load
+	dec a
+.load
 	ld [wLowHealthAlarm], a
 
 	; Enable channel 1 if it's off

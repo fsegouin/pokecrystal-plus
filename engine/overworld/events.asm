@@ -112,6 +112,7 @@ EnterMap:
 	ld [wXYComparePointer + 1], a
 	call SetUpFiveStepWildEncounterCooldown
 	farcall RunMapSetupScript
+	farcall PlusRepelEnterMap ; plus: a building ends repel auto-renew
 	call DisableEvents
 
 	ldh a, [hMapEntryMethod]
@@ -971,8 +972,12 @@ DoRepelStep:
 	ld [wRepelEffect], a
 	ret nz
 
-	ld a, BANK(RepelWoreOffScript)
-	ld hl, RepelWoreOffScript
+	farcall PlusRepelAutoRenew ; plus: tops off without a word while auto-renew is on
+	ld a, [wRepelEffect] ; plus
+	and a ; plus
+	ret nz ; plus: renewed, so the step counts as usual
+	ld a, BANK(PlusRepelWoreOffScript) ; plus: offers to top off
+	ld hl, PlusRepelWoreOffScript ; plus
 	call CallScript
 	scf
 	ret

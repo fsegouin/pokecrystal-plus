@@ -14,6 +14,11 @@ the vanilla ROM.
 | Trainer and gym leader rematches | always on |
 | Shiny chain for wild and static encounters | always on, POKé RADAR turns it off |
 | POKé RADAR key item to check, clear or turn off the chain | Elm's aide |
+| $1 repels in every general mart, topped off when one wears off until you go indoors | always on |
+| Vanilla bug fixes: catch rate, battle engine, AI, HP bar, five-digit EXP | always on |
+| Low HP alarm beeps four times, then stops | always on |
+| Type matchup markers on the battle move list (▲ ▼ ×) | always on |
+| B on the battle menu moves the cursor to RUN | always on |
 | 60 fps overworld | Options, SELECT sub-page (on by default) |
 | Running shoes (hold B) | always on |
 | INST text speed | Options, TEXT SPEED |
@@ -28,8 +33,8 @@ The full design notes, storage layout and the list of every vanilla hook are in
 
 ## Playing
 
-Released patches go in [patches_and_info/](patches_and_info/). None has been
-published yet, so for now build one yourself (below).
+Released patches are in [patches_and_info/](patches_and_info/), alongside the
+symbol table for the latest one. The current release is v0.1.0.
 
 Apply the `.bps` to an unmodified Pokémon Crystal (UE) ROM with Flips, beat or
 any BPS patcher. The patch stores CRC32s of both ROMs, so applying it to the

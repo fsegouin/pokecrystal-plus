@@ -44,4 +44,5 @@ gfx/pokemon/*/frames.asm
 *.ram
 tests/states/
 pokecrystal_vanilla.rev
+!patches_and_info/*.sym
 

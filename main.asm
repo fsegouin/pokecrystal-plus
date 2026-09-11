@@ -694,6 +694,8 @@ INCLUDE "engine/plus/hud_font.asm"
 INCLUDE "data/plus/trainer_basics.asm"
 INCLUDE "engine/plus/trainer.asm"
 INCLUDE "engine/plus/exp.asm"
+INCLUDE "engine/plus/repel.asm"
+INCLUDE "engine/plus/matchup.asm"
 
 
 SECTION "Stadium 2 Checksums", ROMX[$7DE0], BANK[$7F]

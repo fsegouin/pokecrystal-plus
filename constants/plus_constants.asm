@@ -8,9 +8,26 @@
 	const PLUS_WILD_MODE_HI_F ; 2
 	const PLUS_TRAINERS_F     ; 3
 	const PLUS_EXP_BOOST_F    ; 4
+	const PLUS_REPEL_KIND_LO_F ; 5
+	const PLUS_REPEL_KIND_HI_F ; 6
+	const PLUS_REPEL_AUTO_F    ; 7
 
 DEF PLUS_WILD_MODE_MASK  EQU (1 << PLUS_WILD_MODE_LO_F) | (1 << PLUS_WILD_MODE_HI_F)
 DEF PLUS_WILD_MODE_SHIFT EQU PLUS_WILD_MODE_LO_F
+DEF PLUS_REPEL_KIND_MASK EQU (1 << PLUS_REPEL_KIND_LO_F) | (1 << PLUS_REPEL_KIND_HI_F)
+
+; repel kinds (stored in wPlusFlags bits 5-6); 0 means none used yet
+	const_def 1
+	const PLUS_REPEL_KIND_REPEL ; 1
+	const PLUS_REPEL_KIND_SUPER ; 2
+	const PLUS_REPEL_KIND_MAX   ; 3
+DEF NUM_PLUS_REPEL_KINDS EQU const_value - 1
+
+; plus: type matchup markers on the battle move list. The up arrow's own slot,
+; $61, holds HP bar graphics for the whole battle, so the list borrows a blank
+; standard font slot for it: hiragana su, which an English build never places.
+DEF PLUS_MATCHUP_ARROW_TILE EQU $bd
+DEF PLUS_MATCHUP_COLUMN     EQU 18 ; the cell after the longest move name
 
 ; wild randomizer modes (stored in wPlusFlags bits 1-2)
 	const_def

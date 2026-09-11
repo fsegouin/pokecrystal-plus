@@ -3,7 +3,10 @@ LoadBattleMenu:
 	call LoadMenuHeader
 	ld a, [wBattleMenuCursorPosition]
 	ld [wMenuCursorPosition], a
+.loop ; plus
 	call InterpretBattleMenu
+	call PlusBattleMenuB ; plus: B puts the cursor on RUN rather than choosing
+	jr c, .loop ; plus
 	ld a, [wMenuCursorPosition]
 	ld [wBattleMenuCursorPosition], a
 	call ExitMenu
@@ -22,10 +25,30 @@ ContestBattleMenu:
 CommonBattleMenu:
 	ld a, [wBattleMenuCursorPosition]
 	ld [wMenuCursorPosition], a
+.loop ; plus
 	call _2DMenu
+	call PlusBattleMenuB ; plus
+	jr c, .loop ; plus
 	ld a, [wMenuCursorPosition]
 	ld [wBattleMenuCursorPosition], a
 	call ExitMenu
+	ret
+
+PlusBattleMenuB: ; plus
+; B leaves the menu with nothing chosen. Put the cursor on RUN, the bottom
+; right option in the battle and Bug Contest menus alike, and return carry so
+; the caller shows the menu again. Any other way out returns no carry.
+	call GetMenuJoypad
+	and PAD_A | PAD_B
+	cp PAD_B
+	jr nz, .chosen
+	ld a, 4 ; RUN
+	ld [wMenuCursorPosition], a
+	scf
+	ret
+
+.chosen
+	and a
 	ret
 
 BattleMenuHeader:
@@ -35,7 +58,7 @@ BattleMenuHeader:
 	db 1 ; default option
 
 .MenuData:
-	db STATICMENU_CURSOR | STATICMENU_DISABLE_B ; flags
+	db STATICMENU_CURSOR ; flags ; plus: B allowed, for PlusBattleMenuB
 	dn 2, 2 ; rows, columns
 	db 6 ; spacing
 	dba .Text
@@ -80,7 +103,7 @@ ContestBattleMenuHeader:
 	db 1 ; default option
 
 .MenuData:
-	db STATICMENU_CURSOR | STATICMENU_DISABLE_B ; flags
+	db STATICMENU_CURSOR ; flags ; plus: B allowed, for PlusBattleMenuB
 	dn 2, 2 ; rows, columns
 	db 12 ; spacing
 	dba .Text
