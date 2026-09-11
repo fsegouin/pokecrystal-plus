@@ -9,6 +9,8 @@ and distributed as a BPS patch against the vanilla ROM.
 | Trainer roster randomizer | Scientist, Cherrygrove Pokémon Center | done |
 | Catch-up EXP booster | Scientist, Celadon Café | done |
 | Trainer and gym leader rematches | always on | done |
+| Shiny chain for wild and static encounters | always on, POKé RADAR turns it off | done |
+| POKé RADAR key item | Elm's aide | done |
 | 60 fps overworld | Options, SELECT sub-page (on by default) | done |
 | Running shoes (hold B) | always on | done |
 | INST text speed | Options, TEXT SPEED | done |
@@ -20,12 +22,12 @@ are never randomized. The starter is the one deliberate exception.
 ## Building
 
     make crystal          # pokecrystal.gbc (no longer matches roms.sha1 - by design)
-    make patch            # patches_and_info/pokecrystal_plus_v<version>.<date>.bps
+    make patch            # patches_and_info/pokecrystal_plus_v<version>.<yymmdd>.bps
 
 BPS rather than IPS: it stores CRC32s of both ROMs, so applying it to the wrong
-file is rejected rather than silently corrupting it. The built patch and the
+file is rejected rather than silently corrupting it. Released patches and the
 matching `.sym` are committed under `patches_and_info/` so the hack can be
-played without a toolchain.
+played without a toolchain; none has been published yet.
 
 `pokecrystal_vanilla.gbc` is produced by `tools/build_vanilla.sh`, which builds
 the pinned upstream commit in `tools/vanilla_ref.txt` in a temporary worktree
@@ -67,7 +69,9 @@ hook registry below is the complete list either way.
 | ROM code and data | `"Plus"` section, bank `$7f` | ~15 KB free below the Stadium checksums |
 
 The save layout is unchanged: new bytes replace unused padding, so vanilla
-saves load with every feature off.
+saves load with the three Scientist features and 60 fps off. The shiny chain
+starts on, since chaining is only off when `sPlusChainOff` holds
+`PLUS_CHAIN_OFF`.
 
 ## Hook registry
 

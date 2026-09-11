@@ -2,10 +2,9 @@
 
 Released Pokémon Crystal+ patches and their symbol tables live here.
 
-`v0.1.0` is the first release and carries **all five features** listed in
-`docs/plus.md`: wild randomizer, trainer randomizer, catch-up EXP, rematches,
-and the 60 fps overworld. Nothing is published until they are all in, so this
-directory stays empty until then.
+`v0.1.0` is the first release and carries **every feature** listed in the
+table at the top of `docs/plus.md`. This directory stays empty until v0.1.0
+is cut.
 
 To build one:
 
